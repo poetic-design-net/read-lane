@@ -6,6 +6,10 @@
  * Assets: /public/brand/ · src/components/brand/logo.tsx
  */
 
+function stripTrailingSlash(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
 export const appConfig = {
   name: process.env.NEXT_PUBLIC_APP_NAME ?? "Readlane",
   description:
@@ -15,12 +19,15 @@ export const appConfig = {
   claim: "Files in. Beautiful pages out.",
   brandClaim: "Publish beautifully",
   /** App host — dashboard, create, share links (e.g. https://app.readlane.io) */
-  url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  url: stripTrailingSlash(
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+  ),
   /** Marketing site (e.g. https://readlane.io). Defaults to app URL in local dev. */
-  marketingUrl:
+  marketingUrl: stripTrailingSlash(
     process.env.NEXT_PUBLIC_MARKETING_URL ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    "http://localhost:3000",
+      process.env.NEXT_PUBLIC_APP_URL ??
+      "http://localhost:3000"
+  ),
   cliName: process.env.NEXT_PUBLIC_CLI_NAME ?? "readlane",
   cliPackage: process.env.NEXT_PUBLIC_CLI_PACKAGE ?? "@readlane/cli",
 

@@ -46,7 +46,7 @@ export async function startDeviceFlow(meta: {
   return {
     deviceCode,
     userCode,
-    verificationUrl: `${appConfig.url}/cli/authorize?code=${encodeURIComponent(userCode)}`,
+    verificationUrl: `${appConfig.url.replace(/\/+$/, "")}/cli/authorize?code=${encodeURIComponent(userCode)}`,
     expiresIn: appConfig.deviceCodeTtlSeconds,
     interval: 3,
   };

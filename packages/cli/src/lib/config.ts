@@ -3,10 +3,16 @@ import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
 
-export const DEFAULT_API_URL =
+function stripTrailingSlash(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+/** Prefer READLANE_API_URL; default to production Vercel when unset. */
+export const DEFAULT_API_URL = stripTrailingSlash(
   process.env.READLANE_API_URL ??
-  process.env.NEXT_PUBLIC_APP_URL ??
-  "http://localhost:3000";
+    process.env.NEXT_PUBLIC_APP_URL ??
+    "https://read-lane.vercel.app"
+);
 
 export interface ReadlaneLocalConfig {
   version: 1;
