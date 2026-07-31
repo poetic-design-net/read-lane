@@ -229,6 +229,7 @@ export async function createDocument(
     managementToken,
     shareUrl: shareUrl(publicId),
     manageUrl: manageUrl(managementToken),
+    replaced: false as const,
   };
 }
 

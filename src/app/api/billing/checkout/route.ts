@@ -1,53 +1,67 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/service";
 import { appConfig } from "@/lib/config";
+import { createCheckoutSession, BillingError } from "@/lib/billing/service";
+import { getDb } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
- * Stripe Checkout scaffold (v2).
- * When STRIPE_SECRET_KEY + price IDs are set, creates a real session.
- * Otherwise returns a clear configuration message for local dev.
+ * Form POST from dashboard upgrade page.
+ * Redirects to Stripe Checkout when configured.
  */
 export async function POST(req: Request) {
+  let user;
   try {
-    await requireUser();
+    user = await requireUser();
   } catch {
-    return NextResponse.redirect(new URL("/login?next=/dashboard/upgrade", appConfig.url));
-  }
-
-  const form = await req.formData().catch(() => null);
-  const plan = String(form?.get("plan") ?? "pro");
-  const interval = String(form?.get("interval") ?? "monthly");
-
-  const secret = process.env.STRIPE_SECRET_KEY;
-  const priceId =
-    plan === "business"
-      ? interval === "yearly"
-        ? process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID
-        : process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID
-      : interval === "yearly"
-        ? process.env.STRIPE_PRO_YEARLY_PRICE_ID
-        : process.env.STRIPE_PRO_MONTHLY_PRICE_ID;
-
-  if (!secret || !priceId) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "Stripe ist noch nicht konfiguriert. Setze STRIPE_SECRET_KEY und Price-IDs, oder setze users.plan in der DB manuell auf 'pro'.",
-        plan,
-        interval,
-      },
-      { status: 501 }
+    return NextResponse.redirect(
+      new URL("/login?next=/dashboard/upgrade", appConfig.url)
     );
   }
 
-  // Real Stripe Checkout would go here (stripe.checkout.sessions.create)
-  return NextResponse.json(
-    {
-      ok: false,
-      error:
-        "Stripe SDK noch nicht installiert. ENV ist gesetzt — bitte stripe Package ergänzen und Session erstellen.",
-    },
-    { status: 501 }
-  );
+  const form = await req.formData().catch(() => null);
+  const plan = String(form?.get("plan") ?? "pro") as "pro" | "business";
+  const interval = String(form?.get("interval") ?? "monthly") as
+    | "monthly"
+    | "yearly";
+
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, user.id))
+    .limit(1);
+  if (!row) {
+    return NextResponse.redirect(new URL("/login", appConfig.url));
+  }
+
+  try {
+    const session = await createCheckoutSession({
+      userId: row.id,
+      email: row.email,
+      stripeCustomerId: row.stripeCustomerId,
+      plan: plan === "business" ? "business" : "pro",
+      interval: interval === "yearly" ? "yearly" : "monthly",
+    });
+    if (session.url) {
+      return NextResponse.redirect(session.url);
+    }
+    return NextResponse.json(
+      { ok: false, error: "No checkout URL" },
+      { status: 500 }
+    );
+  } catch (e) {
+    if (e instanceof BillingError) {
+      return NextResponse.json(
+        { ok: false, error: e.message, code: e.code },
+        { status: e.code === "NOT_CONFIGURED" ? 501 : 400 }
+      );
+    }
+    console.error("[billing/checkout form]", e);
+    return NextResponse.json(
+      { ok: false, error: "Checkout failed" },
+      { status: 500 }
+    );
+  }
 }

@@ -30,6 +30,15 @@ const PAID_STATUSES = new Set(["active", "trialing", "past_due"]);
 export async function getUserPlan(userId: string): Promise<PlanId> {
   const db = getDb();
 
+  const [user] = await db
+    .select({ plan: users.plan, isAdmin: users.isAdmin })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  // Platform admins always get business entitlements
+  if (user?.isAdmin) return "business";
+
   const subs = await db
     .select()
     .from(subscriptions)
@@ -43,14 +52,9 @@ export async function getUserPlan(userId: string): Promise<PlanId> {
     return sub.plan;
   }
 
-  const [user] = await db
-    .select({ plan: users.plan })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-
   return (user?.plan as PlanId) ?? "free";
 }
+
 
 /** EntitlementService — single source of truth for feature gates */
 export async function getEntitlements(userId: string): Promise<{

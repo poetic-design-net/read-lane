@@ -26,14 +26,16 @@ export async function setUnlockSession(publicId: string): Promise<void> {
     .sign(getSecret());
 
   const jar = await cookies();
+  // Path `/` so unlock works for both /d/:id and /s/:id share routes
   jar.set(cookieName(publicId), token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    path: `/d/${publicId}`,
+    path: "/",
     maxAge: appConfig.unlockSessionTtlSeconds,
   });
 }
+
 
 /**
  * Verify unlock session for a document. Returns true if valid.

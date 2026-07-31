@@ -83,6 +83,7 @@ export const users = pgTable(
     email: text("email").notNull().unique(),
     passwordHash: text("password_hash").notNull(),
     name: text("name"),
+    avatarUrl: text("avatar_url"),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     stripeCustomerId: text("stripe_customer_id").unique(),
     /** Cached effective plan for fast UI (source of truth: subscriptions). */
@@ -97,8 +98,12 @@ export const users = pgTable(
       .defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
-  (t) => [index("users_email_idx").on(t.email)]
+  (t) => [
+    index("users_email_idx").on(t.email),
+    index("users_public_id_idx").on(t.publicId),
+  ]
 );
+
 
 /* ─── Subscriptions (Stripe) ────────────────────────────────────────────── */
 
@@ -111,13 +116,16 @@ export const subscriptions = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     plan: planEnum("plan").notNull().default("free"),
     status: subscriptionStatusEnum("status").notNull().default("active"),
+    stripeCustomerId: text("stripe_customer_id"),
     stripeSubscriptionId: text("stripe_subscription_id").unique(),
     stripePriceId: text("stripe_price_id"),
+    billingInterval: text("billing_interval"), // monthly | yearly
     currentPeriodStart: timestamp("current_period_start", {
       withTimezone: true,
     }),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -137,13 +145,17 @@ export const stripeEvents = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     stripeEventId: text("stripe_event_id").notNull().unique(),
     eventType: text("event_type").notNull(),
+    payloadHash: text("payload_hash"),
+    status: text("status").notNull().default("pending"), // pending | processing | processed | failed
     processedAt: timestamp("processed_at", { withTimezone: true }),
+    errorMessage: text("error_message"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [index("stripe_events_event_id_idx").on(t.stripeEventId)]
 );
+
 
 /* ─── Auth helpers ──────────────────────────────────────────────────────── */
 
@@ -389,6 +401,217 @@ export const documentVersions = pgTable(
   ]
 );
 
+/* ─── Files (object storage metadata) ───────────────────────────────────── */
+
+export const fileUploadStatusEnum = pgEnum("file_upload_status", [
+  "pending",
+  "uploaded",
+  "processing",
+  "ready",
+  "failed",
+  "deleted",
+]);
+
+export const fileScanStatusEnum = pgEnum("file_scan_status", [
+  "pending",
+  "clean",
+  "rejected",
+  "not_required",
+]);
+
+export const files = pgTable(
+  "files",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    publicId: text("public_id").notNull().unique(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id").references(() => documents.id, {
+      onDelete: "set null",
+    }),
+    storageProvider: text("storage_provider").notNull().default("local"),
+    storageKey: text("storage_key").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    safeFilename: text("safe_filename").notNull(),
+    mimeType: text("mime_type").notNull(),
+    fileExtension: text("file_extension"),
+    fileSize: integer("file_size").notNull().default(0),
+    checksum: text("checksum"),
+    uploadStatus: fileUploadStatusEnum("upload_status")
+      .notNull()
+      .default("pending"),
+    scanStatus: fileScanStatusEnum("scan_status")
+      .notNull()
+      .default("not_required"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("files_owner_id_idx").on(t.ownerId),
+    index("files_document_id_idx").on(t.documentId),
+    index("files_storage_key_idx").on(t.storageKey),
+  ]
+);
+
+/* ─── Audit logs ────────────────────────────────────────────────────────── */
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    documentId: uuid("document_id").references(() => documents.id, {
+      onDelete: "set null",
+    }),
+    actorType: text("actor_type").notNull().default("user"),
+    actorId: text("actor_id"),
+    action: text("action").notNull(),
+    metadata: text("metadata"),
+    ipHash: text("ip_hash"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("audit_logs_user_id_idx").on(t.userId),
+    index("audit_logs_action_idx").on(t.action),
+    index("audit_logs_created_at_idx").on(t.createdAt),
+  ]
+);
+
+/* ─── Processing jobs (heavy formats) ───────────────────────────────────── */
+
+export const processingJobStatusEnum = pgEnum("processing_job_status", [
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+  "canceled",
+]);
+
+export const processingJobs = pgTable(
+  "processing_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    type: text("type").notNull(),
+    documentId: uuid("document_id").references(() => documents.id, {
+      onDelete: "cascade",
+    }),
+    fileId: uuid("file_id").references(() => files.id, {
+      onDelete: "cascade",
+    }),
+    status: processingJobStatusEnum("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(3),
+    payload: text("payload"),
+    errorMessage: text("error_message"),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("processing_jobs_status_idx").on(t.status),
+    index("processing_jobs_document_id_idx").on(t.documentId),
+  ]
+);
+
+/* ─── Email verification ────────────────────────────────────────────────── */
+
+export const emailVerificationTokens = pgTable("email_verification_tokens", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/* ─── Document access sessions (password unlock) ────────────────────────── */
+
+export const documentAccessSessions = pgTable(
+  "document_access_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    sessionTokenHash: text("session_token_hash").notNull().unique(),
+    ipHash: text("ip_hash"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (t) => [index("doc_access_sessions_document_id_idx").on(t.documentId)]
+);
+
+/* ─── Idempotency keys ──────────────────────────────────────────────────── */
+
+export const idempotencyKeys = pgTable(
+  "idempotency_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    keyHash: text("key_hash").notNull(),
+    operation: text("operation").notNull(),
+    responseJson: text("response_json"),
+    statusCode: integer("status_code"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("idempotency_user_key_op_idx").on(
+      t.userId,
+      t.keyHash,
+      t.operation
+    ),
+  ]
+);
+
+/* ─── Free-document selection for downgrade ─────────────────────────────── */
+
+export const freeDocumentSelections = pgTable(
+  "free_document_selections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" })
+      .unique(),
+    documentPublicId: text("document_public_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  }
+);
+
 export type User = typeof users.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type Document = typeof documents.$inferSelect;
@@ -396,3 +619,6 @@ export type NewDocument = typeof documents.$inferInsert;
 export type CliToken = typeof cliTokens.$inferSelect;
 export type DocumentVersion = typeof documentVersions.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
+export type FileRecord = typeof files.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
