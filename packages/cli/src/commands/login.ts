@@ -23,21 +23,35 @@ export async function loginCommand(opts: { apiUrl?: string }) {
     }),
   });
 
+  if (!started?.deviceCode || !started?.userCode || !started?.verificationUrl) {
+    console.error(pc.red("Unerwartete API-Antwort. Bitte CLI aktualisieren / API prüfen."));
+    console.error(pc.dim(JSON.stringify(started)));
+    process.exitCode = 1;
+    return;
+  }
+
+  // Normalize accidental double slashes from trailing APP_URL slash
+  const verificationUrl = started.verificationUrl.replace(
+    /([^:]\/)\/+/g,
+    "$1"
+  );
+
   console.log();
   console.log(pc.bold("CLI-Anmeldung"));
   console.log(`Code: ${pc.cyan(pc.bold(started.userCode))}`);
-  console.log(`Browser: ${started.verificationUrl}`);
+  console.log(`Browser: ${verificationUrl}`);
   console.log();
   console.log(pc.dim("Warte auf Bestätigung im Browser…"));
+  console.log(pc.dim("(Im Browser bei Readlane einloggen und den Code bestätigen.)"));
 
   try {
-    await open(started.verificationUrl);
+    await open(verificationUrl);
   } catch {
     // ignore
   }
 
-  const intervalMs = Math.max(2, started.interval) * 1000;
-  const deadline = Date.now() + started.expiresIn * 1000;
+  const intervalMs = Math.max(2, started.interval ?? 3) * 1000;
+  const deadline = Date.now() + (started.expiresIn ?? 900) * 1000;
 
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, intervalMs));
