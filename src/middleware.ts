@@ -2,11 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * Host routing:
- * - app.readlane.io  → product (`/` → /dashboard; auth pages redirect there)
- * - readlane.io      → marketing landing at `/`
- * - localhost        → path-based (landing `/`, app under /dashboard|/create|…)
- *
- * Sharing documents always requires an account (enforced in pages + actions).
+ * - app.readlane.io     → product (`/` → /dashboard)
+ * - readlane.io         → marketing; product paths redirect to app.* only if host differs
+ * - *.vercel.app / local → single-host: no cross-host redirects (avoids loops)
  */
 function withSecurityHeaders(response: NextResponse) {
   response.headers.set("X-Content-Type-Options", "nosniff");
@@ -22,7 +20,6 @@ function withSecurityHeaders(response: NextResponse) {
       "max-age=63072000; includeSubDomains; preload"
     );
   }
-  // Baseline CSP — document content is sanitized server-side; disallow scripts from uploads
   response.headers.set(
     "Content-Security-Policy",
     [
@@ -40,20 +37,28 @@ function withSecurityHeaders(response: NextResponse) {
   return response;
 }
 
-export function middleware(request: NextRequest) {
-  const host = request.headers.get("host")?.split(":")[0]?.toLowerCase() ?? "";
-  const { pathname } = request.nextUrl;
-  const isApp = host.startsWith("app.");
+function hostnameOnly(host: string): string {
+  return host.split(":")[0]?.toLowerCase() ?? "";
+}
 
-  // App subdomain: root opens the dashboard (login if needed)
-  if (isApp && pathname === "/") {
+export function middleware(request: NextRequest) {
+  const host = hostnameOnly(request.headers.get("host") ?? "");
+  const { pathname } = request.nextUrl;
+  const isAppSubdomain = host.startsWith("app.");
+  const isLocal = host === "localhost" || host === "127.0.0.1";
+  const isVercelPreview =
+    host.endsWith(".vercel.app") || host.endsWith(".now.sh");
+
+  // App subdomain: root → dashboard
+  if (isAppSubdomain && pathname === "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return withSecurityHeaders(NextResponse.rewrite(url));
   }
 
-  // Marketing apex: send product routes to the app host when configured
-  if (!isApp && host !== "localhost" && host !== "127.0.0.1") {
+  // Cross-host redirect only when marketing and app are truly different hosts.
+  // Skip on localhost, Vercel preview/production single-host, or same hostname.
+  if (!isAppSubdomain && !isLocal && !isVercelPreview) {
     const appOnly = [
       "/create",
       "/dashboard",
@@ -70,7 +75,11 @@ export function middleware(request: NextRequest) {
       if (appUrl) {
         try {
           const target = new URL(pathname + request.nextUrl.search, appUrl);
-          return withSecurityHeaders(NextResponse.redirect(target));
+          const targetHost = hostnameOnly(target.host);
+          // Prevent infinite redirect when APP_URL points at this same host
+          if (targetHost && targetHost !== host) {
+            return withSecurityHeaders(NextResponse.redirect(target));
+          }
         } catch {
           // fall through
         }
@@ -78,7 +87,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Canonical share path rewrite: /s/:id serves same as /d/:id without extra hop when possible
+  // Canonical share path: /s/:id → /d/:id
   if (pathname.startsWith("/s/") && pathname.split("/").length === 3) {
     const shareId = pathname.slice(3);
     if (shareId && !shareId.includes("/")) {
@@ -90,7 +99,6 @@ export function middleware(request: NextRequest) {
 
   return withSecurityHeaders(NextResponse.next());
 }
-
 
 export const config = {
   matcher: [
