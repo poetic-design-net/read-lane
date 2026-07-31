@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field";
+import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -69,16 +69,16 @@ export function PublishDialog({
 
   const visibilityHint =
     state.visibility === "public"
-      ? "Jeder mit dem Link kann das Dokument ohne Passwort öffnen. Es erscheint nicht in einer öffentlichen Liste."
+      ? "Jeder mit dem Link kann öffnen (nicht gelistet)."
       : state.visibility === "unlisted"
-        ? "Nur Personen mit dem langen, geheimen Link können das Dokument öffnen."
-        : "Nur Personen mit dem Link und dem korrekten Passwort können das Dokument öffnen.";
+        ? "Nur mit dem geheimen Link erreichbar."
+        : "Link + Passwort erforderlich.";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[min(90vh,640px)] gap-0 overflow-hidden p-0 sm:max-w-xl">
         {showSuccess ? (
-          <>
+          <div className="flex max-h-[min(90vh,640px)] flex-col gap-4 overflow-y-auto p-5 sm:p-6">
             <DialogHeader>
               <DialogTitle>Erfolgreich veröffentlicht</DialogTitle>
               <DialogDescription>
@@ -87,8 +87,8 @@ export function PublishDialog({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
                 <p className="text-sm font-medium">Share-Link</p>
                 <code className="break-all rounded-md bg-muted px-3 py-2 text-xs">
                   {result.shareUrl}
@@ -101,11 +101,10 @@ export function PublishDialog({
                 <AlertTitle>Vertraulicher Verwaltungslink</AlertTitle>
                 <AlertDescription>
                   Wer diesen Link hat, kann das Dokument bearbeiten oder löschen.
-                  Teilen Sie ihn nicht öffentlich.
                 </AlertDescription>
               </Alert>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <p className="text-sm font-medium">Verwaltungslink</p>
                 <code className="break-all rounded-md bg-muted px-3 py-2 text-xs">
                   {result.manageUrl}
@@ -119,265 +118,298 @@ export function PublishDialog({
               <div className="flex flex-wrap gap-2">
                 <Button render={<Link href={result.shareUrl} target="_blank" />}>
                   <ExternalLink data-icon="inline-start" />
-                  Dokument öffnen
+                  Öffnen
                 </Button>
                 <Button
                   variant="outline"
                   render={<Link href={result.manageUrl} />}
                 >
-                  Dokument verwalten
+                  Verwalten
                 </Button>
                 <Button variant="secondary" onClick={downloadLinks}>
                   <Download data-icon="inline-start" />
-                  Links als Textdatei
+                  Links speichern
                 </Button>
               </div>
             </div>
-          </>
+          </div>
         ) : (
           <>
-            <DialogHeader>
-              <DialogTitle>
-                {mode === "publish" ? "Dokument veröffentlichen" : "Einstellungen"}
-              </DialogTitle>
-              <DialogDescription>
-                Sichtbarkeit, Darstellung und optionale Optionen festlegen.
-              </DialogDescription>
-            </DialogHeader>
+            <div className="border-b border-border px-5 py-4 sm:px-6">
+              <DialogHeader className="gap-1">
+                <DialogTitle className="text-base">
+                  {mode === "publish"
+                    ? "Dokument veröffentlichen"
+                    : "Einstellungen"}
+                </DialogTitle>
+                <DialogDescription className="text-[13px]">
+                  Sichtbarkeit und Darstellung — kompakt anpassbar.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
 
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="title">Titel</FieldLabel>
-                <Input
-                  id="title"
-                  value={state.title}
-                  onChange={(e) => onChange({ title: e.target.value })}
-                  placeholder="Dokumenttitel"
-                  maxLength={200}
-                />
-              </Field>
-
-              <Field>
-                <FieldLabel htmlFor="description">Beschreibung</FieldLabel>
-                <Textarea
-                  id="description"
-                  value={state.description}
-                  onChange={(e) => onChange({ description: e.target.value })}
-                  placeholder="Optionale kurze Beschreibung"
-                  rows={2}
-                  maxLength={500}
-                />
-              </Field>
-
-              <Field>
-                <FieldLabel>Sichtbarkeit</FieldLabel>
-                <Select
-                  value={state.visibility}
-                  onValueChange={(v) =>
-                    onChange({ visibility: v as EditorDocumentState["visibility"] })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">Öffentlich</SelectItem>
-                    <SelectItem value="unlisted">Nicht gelistet</SelectItem>
-                    <SelectItem value="password">Passwortgeschützt</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FieldDescription>{visibilityHint}</FieldDescription>
-              </Field>
-
-              {state.visibility === "password" && (
-                <Field>
-                  <FieldLabel htmlFor="password">Passwort</FieldLabel>
+            <div className="max-h-[min(60vh,480px)] overflow-y-auto px-5 py-4 sm:px-6">
+              <div className="flex flex-col gap-3">
+                {/* Title + description compact */}
+                <Field className="gap-1.5">
+                  <FieldLabel htmlFor="title" className="text-[12px]">
+                    Titel
+                  </FieldLabel>
                   <Input
-                    id="password"
-                    type="password"
-                    autoComplete="new-password"
-                    value={state.password}
-                    onChange={(e) => onChange({ password: e.target.value })}
-                    placeholder={
-                      mode === "settings"
-                        ? "Leer lassen, um beizubehalten"
-                        : "Passwort festlegen"
-                    }
+                    id="title"
+                    value={state.title}
+                    onChange={(e) => onChange({ title: e.target.value })}
+                    placeholder="Dokumenttitel"
+                    maxLength={200}
+                    className="h-8"
                   />
                 </Field>
-              )}
 
-              <Field>
-                <FieldLabel>Status</FieldLabel>
-                <Select
-                  value={state.status}
-                  onValueChange={(v) =>
-                    onChange({ status: v as EditorDocumentState["status"] })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="published">Veröffentlicht</SelectItem>
-                    <SelectItem value="draft">Entwurf</SelectItem>
-                    <SelectItem value="archived">Archiviert</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field>
-                <FieldLabel>Theme</FieldLabel>
-                <Select
-                  value={state.theme}
-                  onValueChange={(v) =>
-                    onChange({ theme: v as EditorDocumentState["theme"] })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="system">System</SelectItem>
-                    <SelectItem value="light">Hell</SelectItem>
-                    <SelectItem value="dark">Dunkel</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field>
-                <FieldLabel>Lesebreite</FieldLabel>
-                <Select
-                  value={state.contentWidth}
-                  onValueChange={(v) =>
-                    onChange({
-                      contentWidth: v as EditorDocumentState["contentWidth"],
-                    })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="narrow">Schmal</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="wide">Breit</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field>
-                <FieldLabel>Schrift</FieldLabel>
-                <Select
-                  value={state.fontStyle}
-                  onValueChange={(v) =>
-                    onChange({ fontStyle: v as EditorDocumentState["fontStyle"] })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sans">Sans-Serif</SelectItem>
-                    <SelectItem value="serif">Serif</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field>
-                <FieldLabel>Ablaufzeit</FieldLabel>
-                <Select
-                  value={state.expiryPreset}
-                  onValueChange={(v) =>
-                    onChange({
-                      expiryPreset: v as EditorDocumentState["expiryPreset"],
-                    })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="never">Nie</SelectItem>
-                    <SelectItem value="24h">Nach 24 Stunden</SelectItem>
-                    <SelectItem value="7d">Nach 7 Tagen</SelectItem>
-                    <SelectItem value="30d">Nach 30 Tagen</SelectItem>
-                    <SelectItem value="custom">Benutzerdefiniertes Datum</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              {state.expiryPreset === "custom" && (
-                <Field>
-                  <FieldLabel htmlFor="expiry">Ablaufdatum</FieldLabel>
-                  <Input
-                    id="expiry"
-                    type="datetime-local"
-                    value={state.customExpiryDate}
-                    onChange={(e) =>
-                      onChange({ customExpiryDate: e.target.value })
-                    }
+                <Field className="gap-1.5">
+                  <FieldLabel htmlFor="description" className="text-[12px]">
+                    Beschreibung
+                  </FieldLabel>
+                  <Textarea
+                    id="description"
+                    value={state.description}
+                    onChange={(e) => onChange({ description: e.target.value })}
+                    placeholder="Optional"
+                    rows={2}
+                    maxLength={500}
+                    className="min-h-0 resize-none text-sm"
                   />
                 </Field>
-              )}
 
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium">Inhaltsverzeichnis</p>
-                  <p className="text-xs text-muted-foreground">
-                    Automatisch aus Überschriften
+                {/* 2-col grid for selects */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field className="gap-1.5">
+                    <FieldLabel className="text-[12px]">Sichtbarkeit</FieldLabel>
+                    <Select
+                      value={state.visibility}
+                      onValueChange={(v) =>
+                        onChange({
+                          visibility: v as EditorDocumentState["visibility"],
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="public">Öffentlich</SelectItem>
+                        <SelectItem value="unlisted">Nicht gelistet</SelectItem>
+                        <SelectItem value="password">Passwort</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field className="gap-1.5">
+                    <FieldLabel className="text-[12px]">Status</FieldLabel>
+                    <Select
+                      value={state.status}
+                      onValueChange={(v) =>
+                        onChange({
+                          status: v as EditorDocumentState["status"],
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="published">Veröffentlicht</SelectItem>
+                        <SelectItem value="draft">Entwurf</SelectItem>
+                        <SelectItem value="archived">Archiviert</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field className="gap-1.5">
+                    <FieldLabel className="text-[12px]">Theme</FieldLabel>
+                    <Select
+                      value={state.theme}
+                      onValueChange={(v) =>
+                        onChange({ theme: v as EditorDocumentState["theme"] })
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="system">System</SelectItem>
+                        <SelectItem value="light">Hell</SelectItem>
+                        <SelectItem value="dark">Dunkel</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field className="gap-1.5">
+                    <FieldLabel className="text-[12px]">Lesebreite</FieldLabel>
+                    <Select
+                      value={state.contentWidth}
+                      onValueChange={(v) =>
+                        onChange({
+                          contentWidth:
+                            v as EditorDocumentState["contentWidth"],
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="narrow">Schmal</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
+                        <SelectItem value="wide">Breit</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field className="gap-1.5">
+                    <FieldLabel className="text-[12px]">Schrift</FieldLabel>
+                    <Select
+                      value={state.fontStyle}
+                      onValueChange={(v) =>
+                        onChange({
+                          fontStyle: v as EditorDocumentState["fontStyle"],
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sans">Sans</SelectItem>
+                        <SelectItem value="serif">Serif</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field className="gap-1.5">
+                    <FieldLabel className="text-[12px]">Ablaufzeit</FieldLabel>
+                    <Select
+                      value={state.expiryPreset}
+                      onValueChange={(v) =>
+                        onChange({
+                          expiryPreset:
+                            v as EditorDocumentState["expiryPreset"],
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="never">Nie</SelectItem>
+                        <SelectItem value="24h">24 Stunden</SelectItem>
+                        <SelectItem value="7d">7 Tage</SelectItem>
+                        <SelectItem value="30d">30 Tage</SelectItem>
+                        <SelectItem value="custom">Datum…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  {visibilityHint}
+                </p>
+
+                {state.visibility === "password" && (
+                  <Field className="gap-1.5">
+                    <FieldLabel htmlFor="password" className="text-[12px]">
+                      Passwort
+                    </FieldLabel>
+                    <Input
+                      id="password"
+                      type="password"
+                      autoComplete="new-password"
+                      value={state.password}
+                      onChange={(e) => onChange({ password: e.target.value })}
+                      placeholder={
+                        mode === "settings"
+                          ? "Leer lassen = beibehalten"
+                          : "Passwort"
+                      }
+                      className="h-8"
+                    />
+                  </Field>
+                )}
+
+                {state.expiryPreset === "custom" && (
+                  <Field className="gap-1.5">
+                    <FieldLabel htmlFor="expiry" className="text-[12px]">
+                      Ablaufdatum
+                    </FieldLabel>
+                    <Input
+                      id="expiry"
+                      type="datetime-local"
+                      value={state.customExpiryDate}
+                      onChange={(e) =>
+                        onChange({ customExpiryDate: e.target.value })
+                      }
+                      className="h-8"
+                    />
+                  </Field>
+                )}
+
+                {/* Switches side by side */}
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-2.5 py-2">
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium leading-tight">
+                        Inhaltsverzeichnis
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Aus Überschriften
+                      </p>
+                    </div>
+                    <Switch
+                      checked={state.showTableOfContents}
+                      onCheckedChange={(v) =>
+                        onChange({ showTableOfContents: v })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-2.5 py-2">
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium leading-tight">
+                        Zeilennummern
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        In Codeblöcken
+                      </p>
+                    </div>
+                    <Switch
+                      checked={state.showCodeLineNumbers}
+                      onCheckedChange={(v) =>
+                        onChange({ showCodeLineNumbers: v })
+                      }
+                    />
+                  </div>
+                </div>
+
+                {mode === "publish" && (
+                  <p className="rounded-lg bg-muted/60 px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
+                    Nach dem Veröffentlichen erhalten Sie Share- und
+                    Verwaltungslink. Den Verwaltungslink geheim halten.
                   </p>
-                </div>
-                <Switch
-                  checked={state.showTableOfContents}
-                  onCheckedChange={(v) => onChange({ showTableOfContents: v })}
-                />
+                )}
+
+                {shareUrl && mode === "settings" && (
+                  <div className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-2">
+                    <code className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                      {shareUrl}
+                    </code>
+                    <CopyButton value={shareUrl} label="" />
+                  </div>
+                )}
               </div>
+            </div>
 
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium">Zeilennummern</p>
-                  <p className="text-xs text-muted-foreground">In Codeblöcken</p>
-                </div>
-                <Switch
-                  checked={state.showCodeLineNumbers}
-                  onCheckedChange={(v) => onChange({ showCodeLineNumbers: v })}
-                />
-              </div>
-
-              {mode === "publish" && (
-                <Alert>
-                  <ShieldAlert />
-                  <AlertTitle>Wichtige Hinweise</AlertTitle>
-                  <AlertDescription>
-                    <ul className="mt-1 list-disc pl-4 text-sm">
-                      <li>{visibilityHint}</li>
-                      <li>
-                        Nach der Veröffentlichung erhalten Sie einen geheimen
-                        Verwaltungslink — bewahren Sie ihn sicher auf.
-                      </li>
-                      {state.visibility === "password" && (
-                        <li>Ein Passwort ist erforderlich, um das Dokument zu öffnen.</li>
-                      )}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {shareUrl && mode === "settings" && (
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm font-medium">Share-Link</p>
-                  <code className="break-all rounded-md bg-muted px-3 py-2 text-xs">
-                    {shareUrl}
-                  </code>
-                  <CopyButton value={shareUrl} />
-                </div>
-              )}
-            </FieldGroup>
-
-            <DialogFooter>
+            <DialogFooter className="border-t border-border px-5 py-3 sm:px-6">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => onOpenChange(false)}
                 type="button"
               >
@@ -385,6 +417,7 @@ export function PublishDialog({
               </Button>
               <Button
                 type="button"
+                size="sm"
                 disabled={
                   saving ||
                   !state.markdownContent.trim() ||
@@ -398,7 +431,7 @@ export function PublishDialog({
                   ? "Bitte warten…"
                   : mode === "publish"
                     ? "Veröffentlichen"
-                    : "Übernehmen & speichern"}
+                    : "Speichern"}
               </Button>
             </DialogFooter>
           </>
