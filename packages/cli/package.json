@@ -1,0 +1,39 @@
+{
+  "name": "@readlane/cli",
+  "version": "0.1.0",
+  "description": "CLI to publish and sync Markdown documents with Readlane",
+
+  "type": "module",
+  "bin": {
+    "readlane": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "start": "node dist/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "markdown",
+    "cli",
+    "readlane",
+    "publish"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^13.1.0",
+    "fast-glob": "^3.3.3",
+    "open": "^10.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsup": "^8.5.0",
+    "typescript": "^5"
+  }
+}

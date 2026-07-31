@@ -1,0 +1,192 @@
+import { cn } from "@/lib/utils";
+import type { RendererType } from "@/types/document";
+import { MarkdownView } from "@/components/markdown/markdown-view";
+import { languageFromExtension } from "@/lib/documents/formats";
+
+/** Server-safe format display for public document pages. */
+export function FormatView({
+  content,
+  rendererType,
+  fileExtension,
+  sourceFilename,
+  html,
+  showLineNumbers,
+  className,
+}: {
+  content: string;
+  rendererType: RendererType;
+  fileExtension?: string | null;
+  sourceFilename?: string | null;
+  /** Pre-rendered markdown HTML when renderer is markdown */
+  html?: string;
+  showLineNumbers?: boolean;
+  className?: string;
+}) {
+  if (rendererType === "markdown" && html) {
+    return <MarkdownView html={html} className={className} />;
+  }
+
+  if (rendererType === "csv") {
+    return <CsvTable content={content} className={className} />;
+  }
+
+  if (
+    rendererType === "code" ||
+    rendererType === "html" ||
+    rendererType === "text"
+  ) {
+    const lang =
+      rendererType === "text"
+        ? "text"
+        : languageFromExtension(fileExtension || "");
+    const lines = content.replace(/\n$/, "").split("\n");
+    return (
+      <div className={cn("overflow-hidden rounded-xl ring-1 ring-stone-200 dark:ring-stone-800", className)}>
+        {(sourceFilename || lang !== "text") && (
+          <div className="flex items-center justify-between border-b border-stone-100 bg-stone-50 px-4 py-2 text-[11px] text-stone-500 dark:border-stone-800 dark:bg-stone-900">
+            <span className="font-medium">{sourceFilename || "Datei"}</span>
+            <span className="uppercase tracking-wide">{lang}</span>
+          </div>
+        )}
+        <pre
+          className={cn(
+            "overflow-x-auto bg-stone-950 p-4 text-[13px] leading-relaxed text-stone-100",
+            rendererType === "text" &&
+              "bg-white font-sans text-stone-800 dark:bg-stone-950 dark:text-stone-100"
+          )}
+        >
+          <code>
+            {lines.map((line, i) => (
+              <span key={i} className="block min-h-[1.25em]">
+                {showLineNumbers && (
+                  <span className="mr-4 inline-block w-8 select-none text-right text-stone-500">
+                    {i + 1}
+                  </span>
+                )}
+                {line || " "}
+              </span>
+            ))}
+          </code>
+        </pre>
+      </div>
+    );
+  }
+
+  if (rendererType === "pdf") {
+    return (
+      <div
+        className={cn(
+          "rounded-xl border border-dashed border-stone-200 p-10 text-center text-[14px] text-stone-500",
+          className
+        )}
+      >
+        PDF-Viewer folgt (Originaldatei in Object Storage).
+        {sourceFilename && (
+          <p className="mt-2 font-medium text-stone-700">{sourceFilename}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (rendererType === "image") {
+    return (
+      <div className={cn("text-center", className)}>
+        <p className="text-[14px] text-stone-500">
+          Bilddarstellung (Object Storage) — Datei: {sourceFilename || "image"}
+        </p>
+      </div>
+    );
+  }
+
+  // fallback markdown-ish
+  return (
+    <div
+      className={cn(
+        "prose prose-stone max-w-none whitespace-pre-wrap text-[15px] leading-relaxed",
+        className
+      )}
+    >
+      {content}
+    </div>
+  );
+}
+
+function CsvTable({
+  content,
+  className,
+}: {
+  content: string;
+  className?: string;
+}) {
+  const rows = content
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => parseCsvLine(line));
+  if (rows.length === 0) {
+    return <p className="text-sm text-stone-400">Leere Tabelle</p>;
+  }
+  const header = rows[0];
+  const body = rows.slice(1);
+
+  return (
+    <div
+      className={cn(
+        "overflow-x-auto rounded-xl ring-1 ring-stone-200 dark:ring-stone-800",
+        className
+      )}
+    >
+      <table className="w-full min-w-[480px] border-collapse text-left text-[13px]">
+        <thead>
+          <tr className="bg-stone-50 dark:bg-stone-900">
+            {header.map((cell, i) => (
+              <th
+                key={i}
+                className="sticky top-0 border-b border-stone-200 px-3 py-2 font-semibold text-stone-700 dark:border-stone-700 dark:text-stone-200"
+              >
+                {cell}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row, ri) => (
+            <tr
+              key={ri}
+              className="border-b border-stone-100 odd:bg-white even:bg-stone-50/50 dark:border-stone-800 dark:odd:bg-stone-950 dark:even:bg-stone-900/40"
+            >
+              {header.map((_, ci) => (
+                <td
+                  key={ci}
+                  className="px-3 py-2 text-stone-600 dark:text-stone-300"
+                >
+                  {row[ci] ?? ""}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function parseCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else inQ = !inQ;
+    } else if (c === "," && !inQ) {
+      out.push(cur);
+      cur = "";
+    } else cur += c;
+  }
+  out.push(cur);
+  return out;
+}

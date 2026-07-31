@@ -1,0 +1,33 @@
+# Example CI: publish Markdown on push to main
+# Required secret: READLANE_TOKEN (project-scoped or full CLI token)
+
+name: Publish Markdown
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.md"
+      - ".readlane.json"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install CLI
+        run: npm install -g @readlane/cli
+        # Until published to npm, use:
+        # run: npm install -g ./packages/cli
+
+      - name: Push all docs
+        run: readlane push --all --yes
+        env:
+          READLANE_TOKEN: ${{ secrets.READLANE_TOKEN }}
+          READLANE_API_URL: ${{ vars.READLANE_API_URL }}
