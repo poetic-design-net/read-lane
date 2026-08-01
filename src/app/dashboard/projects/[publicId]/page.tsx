@@ -10,6 +10,9 @@ import { toListItem } from "@/lib/documents/mappers";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProjectWorkspace } from "@/components/workspace/project-workspace";
 import { ProjectSettingsForm } from "@/components/dashboard/project-settings-form";
+import { ProjectMembersPanel } from "@/components/dashboard/project-members-panel";
+import { listProjectMembers } from "@/lib/projects/members";
+import { getEntitlements } from "@/lib/plans/service";
 
 interface PageProps {
   params: Promise<{ publicId: string }>;
@@ -87,6 +90,13 @@ export default async function ProjectPage({ params, searchParams }: PageProps) {
   };
 
   const showSettings = settings === "1";
+  // The owner's plan decides whether this project can have members at all.
+  const [members, { entitlements: ownerEntitlements }] = showSettings
+    ? await Promise.all([
+        listProjectMembers(project.publicId, user.id),
+        getEntitlements(project.ownerId),
+      ])
+    : [[], { entitlements: { teamMembers: false } }];
 
   return (
     <AppShell
@@ -116,6 +126,12 @@ export default async function ProjectPage({ params, searchParams }: PageProps) {
               defaultContentWidth: project.defaultContentWidth,
               defaultFontStyle: project.defaultFontStyle,
             }}
+          />
+          <ProjectMembersPanel
+            publicId={project.publicId}
+            members={members}
+            canManage={project.ownerId === user.id}
+            teamsEnabled={ownerEntitlements.teamMembers}
           />
         </div>
       ) : (

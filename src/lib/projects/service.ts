@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { documents, projectMembers, projects } from "@/lib/db/schema";
 import { createProjectPublicId } from "@/lib/security/tokens";
@@ -118,6 +118,7 @@ export async function listProjectsForUser(
   const rows = await db
     .select({
       publicId: projects.publicId,
+      ownerId: projects.ownerId,
       name: projects.name,
       slug: projects.slug,
       description: projects.description,
@@ -136,7 +137,15 @@ export async function listProjectsForUser(
     .from(projects)
     .where(
       and(
-        eq(projects.ownerId, userId),
+        // Own projects plus the ones shared with this user.
+        or(
+          eq(projects.ownerId, userId),
+          sql`EXISTS (
+            SELECT 1 FROM project_members
+            WHERE project_members.project_id = ${projects.id}
+            AND project_members.user_id = ${userId}
+          )`
+        ),
         options.includeArchived ? undefined : isNull(projects.archivedAt)
       )
     )
@@ -145,6 +154,7 @@ export async function listProjectsForUser(
   return rows.map((r) => ({
     ...r,
     documentCount: Number(r.documentCount ?? 0),
+    isOwner: r.ownerId === userId,
   }));
 }
 

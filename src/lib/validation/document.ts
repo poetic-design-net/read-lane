@@ -192,6 +192,13 @@ export const projectUpdateSchema = projectCreateSchema.partial().extend({
   archived: z.boolean().optional(),
 });
 
+export const memberRoleSchema = z.enum(["editor", "viewer"]);
+
+export const addMemberSchema = z.object({
+  email: z.string().email().max(appConfig.limits.emailMax),
+  role: memberRoleSchema.default("viewer"),
+});
+
 export const frontmatterSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),

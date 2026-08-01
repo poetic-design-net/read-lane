@@ -96,6 +96,8 @@ export interface ProjectSummary {
   defaultTheme: Theme;
   defaultContentWidth: ContentWidth;
   defaultFontStyle: FontStyle;
+  /** False for projects shared with this user by someone else. */
+  isOwner?: boolean;
 }
 
 export interface SafeDocumentListItem {

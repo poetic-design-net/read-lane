@@ -35,6 +35,7 @@ import {
 } from "@/lib/validation/document";
 import { manageUrl, shareUrl } from "@/lib/utils/urls";
 import { assertProjectAccess } from "@/lib/projects/service";
+import { canAccessDocument } from "@/lib/projects/members";
 import type { ActionResult } from "./auth";
 
 export async function publishDocumentAction(
@@ -240,17 +241,13 @@ export async function updateDashboardDocumentAction(
   }
 
   const doc = await getDocumentByPublicId(publicId);
-  if (!doc || doc.createdBy !== user.id) {
-    // Also allow project owners
-    if (!doc) return { ok: false, error: "Nicht gefunden" };
-    // ownership check via project later — for MVP creator only
-    if (doc.createdBy !== user.id) {
-      return { ok: false, error: "Kein Zugriff" };
-    }
+  if (!doc) return { ok: false, error: "Nicht gefunden" };
+  if (!(await canAccessDocument(doc, user.id, "editor"))) {
+    return { ok: false, error: "Kein Zugriff" };
   }
 
   try {
-    await updateDocumentById(doc!, parsed.data, {
+    await updateDocumentById(doc, parsed.data, {
       userId: user.id,
       source: "web",
     });
@@ -268,11 +265,7 @@ export async function createManagementUrlAction(
 ): Promise<ActionResult<{ manageUrl: string }>> {
   const user = await requireUser();
   const doc = await getDocumentByPublicId(publicId);
-  if (!doc || (doc.createdBy !== user.id && !doc.projectId)) {
-    return { ok: false, error: "Kein Zugriff" };
-  }
-  // Verify ownership
-  if (doc.createdBy !== user.id) {
+  if (!doc || !(await canAccessDocument(doc, user.id, "editor"))) {
     return { ok: false, error: "Kein Zugriff" };
   }
   const token = await createSignedManagementToken(publicId, user.id);
@@ -285,7 +278,7 @@ export async function createManagementUrlAction(
 export async function getDocumentVersionsAction(publicId: string) {
   const user = await requireUser();
   const doc = await getDocumentByPublicId(publicId);
-  if (!doc || doc.createdBy !== user.id) {
+  if (!doc || !(await canAccessDocument(doc, user.id, "viewer"))) {
     return { ok: false as const, error: "Kein Zugriff" };
   }
   const versions = await listVersions(doc.id);
@@ -298,7 +291,7 @@ export async function restoreDocumentVersionAction(
 ): Promise<ActionResult> {
   const user = await requireUser();
   const doc = await getDocumentByPublicId(publicId);
-  if (!doc || doc.createdBy !== user.id) {
+  if (!doc || !(await canAccessDocument(doc, user.id, "editor"))) {
     return { ok: false, error: "Kein Zugriff" };
   }
   try {
