@@ -320,8 +320,7 @@ export function CreateWorkspace({
             {!result && !hasContent && (
               <ExamplePicker
                 plan={plan}
-                projectId={state.projectId}
-                onLoadSingle={(example, upload) => {
+                onLoad={(example, upload) => {
                   update({
                     title: example.title,
                     description: "",
