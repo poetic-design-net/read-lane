@@ -20,7 +20,8 @@
     "db:seed": "npx tsx src/lib/db/seed.ts",
     "db:admin": "npx tsx scripts/ensure-admin.ts",
     "cli:build": "npm run build -w @readlane/cli",
-    "cli:dev": "npm run dev -w @readlane/cli"
+    "cli:dev": "npm run dev -w @readlane/cli",
+    "db:apply": "node --env-file=.env.local scripts/apply-sql.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
