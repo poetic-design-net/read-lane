@@ -186,6 +186,7 @@ export async function createDocument(
       fontStyle: input.fontStyle,
       showTableOfContents: input.showTableOfContents,
       showCodeLineNumbers: input.showCodeLineNumbers,
+      allowDownload: input.allowDownload ?? true,
       projectId: input.projectId ?? null,
       sourcePath: input.sourcePath ?? null,
       sourceFilename: input.sourceFilename ?? filename,
@@ -309,6 +310,7 @@ export async function replaceDocumentContent(
       fontStyle: input.fontStyle,
       showTableOfContents: input.showTableOfContents,
       showCodeLineNumbers: input.showCodeLineNumbers,
+      allowDownload: input.allowDownload ?? true,
       sourceFilename: input.sourceFilename ?? options.filename,
       sourcePath: input.sourcePath ?? doc.sourcePath,
       sourceChecksum: checksum,
@@ -318,11 +320,14 @@ export async function replaceDocumentContent(
       updatedAt: new Date(),
       publishedAt: doc.publishedAt ?? new Date(),
       rendererType: options.rendererType,
-      mimeType: options.mimeType ?? doc.mimeType,
+      // Replace swaps the whole source, so file metadata is overwritten rather
+      // than merged — otherwise a markdown replacement keeps pointing at the
+      // PDF it replaced.
+      mimeType: options.mimeType ?? null,
       fileExtension: options.fileExtension,
       fileSize:
         options.fileSize ?? Buffer.byteLength(input.markdownContent),
-      originalFileKey: options.originalFileKey ?? doc.originalFileKey,
+      originalFileKey: options.originalFileKey ?? null,
       archivedAt: null,
     })
     .where(eq(documents.id, doc.id))
@@ -531,6 +536,7 @@ export async function updateDocumentById(
         input.showTableOfContents ?? doc.showTableOfContents,
       showCodeLineNumbers:
         input.showCodeLineNumbers ?? doc.showCodeLineNumbers,
+      allowDownload: input.allowDownload ?? doc.allowDownload,
       sourcePath:
         input.sourcePath !== undefined ? input.sourcePath : doc.sourcePath,
       sourceFilename:

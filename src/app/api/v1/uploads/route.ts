@@ -2,10 +2,15 @@ import { NextRequest } from "next/server";
 import { apiError, apiOk, createRequestId } from "@/lib/api/errors";
 import { requireAuth, ApiAuthError } from "@/lib/api/auth-context";
 import { FileError, processUpload } from "@/lib/files/service";
+import { isBinaryRenderer } from "@/lib/documents/formats";
+import { getStorage } from "@/lib/storage";
 import { PlanError } from "@/lib/plans/service";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { getClientIp } from "@/lib/security/client-ip";
 import { appConfig } from "@/lib/config";
+
+/** Editor preview links stay valid just long enough to publish. */
+const PREVIEW_TTL_SECONDS = 900;
 
 /**
  * Multipart upload: field "file" required.
@@ -55,6 +60,11 @@ export async function POST(req: NextRequest) {
           : null,
     });
 
+    // Short-lived preview URL so the editor can show binary formats before publishing
+    const previewUrl = isBinaryRenderer(result.rendererType)
+      ? await getStorage().getSignedReadUrl(result.storageKey, PREVIEW_TTL_SECONDS)
+      : null;
+
     return apiOk(
       {
         file: {
@@ -64,9 +74,9 @@ export async function POST(req: NextRequest) {
           size: result.file.fileSize,
           rendererType: result.rendererType,
           checksum: result.checksum,
-          storageKey: result.storageKey,
         },
         content: result.content,
+        previewUrl,
       },
       201,
       requestId

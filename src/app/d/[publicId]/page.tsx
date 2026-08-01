@@ -19,9 +19,13 @@ import { appConfig } from "@/lib/config";
 import { brandConfig } from "@/lib/brand/config";
 import { shareUrl } from "@/lib/utils/urls";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { getStorage } from "@/lib/storage";
 
 /** Password sessions and visibility checks must never be statically cached. */
 export const dynamic = "force-dynamic";
+
+/** Signed file links stay valid only for the duration of a visit. */
+const FILE_URL_TTL_SECONDS = 900;
 
 interface PageProps {
   params: Promise<{ publicId: string }>;
@@ -121,6 +125,17 @@ export default async function DocumentPage({ params }: PageProps) {
       })
     : { html: "", toc: [] as { id: string; text: string; level: number }[] };
 
+  // Binary formats live in object storage. The page is force-dynamic, so every
+  // visit mints a fresh short-lived URL instead of exposing a permanent one.
+  const fileUrl = view.raw.originalFileKey
+    ? await getStorage().getSignedReadUrl(
+        view.raw.originalFileKey,
+        FILE_URL_TTL_SECONDS
+      )
+    : null;
+  const downloadUrl =
+    fileUrl && document.allowDownload ? `${fileUrl}&download=1` : null;
+
   const statusKind = statusFromDocument({
     status: document.status,
     visibility: document.visibility,
@@ -189,6 +204,9 @@ export default async function DocumentPage({ params }: PageProps) {
               sourceFilename={document.sourceFilename}
               html={isMarkdown ? html : undefined}
               showLineNumbers={document.showCodeLineNumbers}
+              fileUrl={fileUrl}
+              downloadUrl={downloadUrl}
+              allowDownload={document.allowDownload}
             />
 
             <footer className="mt-16 border-t border-stone-100 pt-6 text-[12px] text-stone-400 dark:border-stone-800">

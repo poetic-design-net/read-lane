@@ -14,6 +14,10 @@ import {
   listVersions,
   restoreVersion,
 } from "@/lib/documents/service";
+import {
+  attachFileToDocument,
+  getOwnedFileByPublicId,
+} from "@/lib/files/service";
 import { createSignedManagementToken } from "@/lib/security/auth-session";
 import { hashPassword, verifyPassword } from "@/lib/security/passwords";
 import {
@@ -82,12 +86,28 @@ export async function publishDocumentAction(
     }
   }
 
+  // Uploaded file: resolve ownership server-side. The storage key is never
+  // taken from the request.
+  let file = null;
+  if (parsed.data.fileId) {
+    file = await getOwnedFileByPublicId(parsed.data.fileId, user.id);
+    if (!file) {
+      return { ok: false, error: "Datei nicht gefunden" };
+    }
+  }
+
   try {
     const result = await createDocument(parsed.data, {
       userId: user.id,
       source: "web",
       replaceActive: Boolean(parsed.data.replaceActive),
+      mimeType: file?.mimeType ?? null,
+      fileSize: file?.fileSize ?? null,
+      originalFileKey: file?.storageKey ?? null,
     });
+    if (file) {
+      await attachFileToDocument(file.publicId, result.document.publicId);
+    }
     revalidatePath("/dashboard");
     revalidatePath(`/d/${result.document.publicId}`);
     if (parsed.data.projectId) {

@@ -51,14 +51,17 @@ export async function registerUser(input: {
   }
 
   const passwordHash = await hashSecret(input.password);
+  const { createSharePublicId } = await import("@/lib/security/tokens");
   const [user] = await db
     .insert(users)
     .values({
       email,
       passwordHash,
       name: input.name?.trim() || null,
+      publicId: `usr_${createSharePublicId()}`,
     })
     .returning();
+
 
   if (!user) throw new AuthError("Registrierung fehlgeschlagen", "NOT_FOUND");
 

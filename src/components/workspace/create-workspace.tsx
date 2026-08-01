@@ -294,7 +294,7 @@ export function CreateWorkspace({
               <Plus data-icon="inline-start" />
               Dokument hochladen
             </Button>
-            {!result && (
+            {!result && !hasContent && (
               <Button
                 size="sm"
                 variant="outline"
@@ -364,54 +364,7 @@ export function CreateWorkspace({
           </div>
         </div>
 
-        {!hasContent ? (
-          <div
-            className={cn(
-              "mb-4 flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-14 text-center transition",
-              dragOver
-                ? "border-stone-400 bg-stone-50 dark:border-stone-500"
-                : "border-stone-200 dark:border-stone-700"
-            )}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-          >
-            <Upload className="mb-3 size-6 text-stone-300" strokeWidth={1.5} />
-            <p className="text-sm font-medium text-stone-700 dark:text-stone-200">
-              Markdown hier ablegen oder eintippen
-            </p>
-            <p className="mt-1 max-w-sm text-[13px] text-stone-400">
-              .md, .markdown, .txt bis{" "}
-              {Math.round(appConfig.maxFileSizeBytes / 1024 / 1024)} MB
-            </p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Button
-                size="sm"
-                className="rounded-full"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Datei wählen
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-full"
-                onClick={() =>
-                  update({
-                    markdownContent: EXAMPLE_MARKDOWN,
-                    title: "Beispieldokument",
-                  })
-                }
-              >
-                Beispiel laden
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-4 min-h-0 flex-1">
+        <div className="mb-4 min-h-0 flex-1">
             <div className="mb-2 flex items-center justify-between">
               <div className="flex min-w-0 items-center gap-2">
                 <FileText className="size-3.5 shrink-0 text-stone-400" />
@@ -420,7 +373,7 @@ export function CreateWorkspace({
                 </span>
                 <StatusPill kind={statusKind} />
               </div>
-              {!result && (
+              {!result && hasContent && (
                 <Button
                   size="icon-xs"
                   variant="ghost"
@@ -438,9 +391,10 @@ export function CreateWorkspace({
               )}
             </div>
             <Textarea
+              autoFocus
               value={state.markdownContent}
               onChange={(e) => update({ markdownContent: e.target.value })}
-              placeholder="Markdown hier einfügen…"
+              placeholder="Markdown hier einfügen oder Datei ablegen…"
               className="min-h-[min(50vh,420px)] flex-1 resize-y rounded-xl border-stone-200 bg-stone-50/50 font-mono text-[13px] dark:border-stone-800 dark:bg-stone-900/40"
               onDragOver={(e) => {
                 e.preventDefault();
@@ -476,8 +430,7 @@ export function CreateWorkspace({
                 </div>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         <div className="mt-auto grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-stone-50 p-3.5 ring-1 ring-stone-100 dark:bg-stone-900 dark:ring-stone-800">

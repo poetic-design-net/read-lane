@@ -3,12 +3,14 @@
  */
 
 import { createHash, randomBytes } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { files, users } from "@/lib/db/schema";
+import { documents, files, users } from "@/lib/db/schema";
 import {
   detectRenderer,
   extensionOf,
+  isBlockedFilename,
+  sanitizeFilename,
   type RendererType,
 } from "@/lib/documents/formats";
 import {
@@ -35,16 +37,6 @@ export class FileError extends Error {
   }
 }
 
-const BLOCKED_NAMES = [
-  /^\.env(\.|$)/i,
-  /\.pem$/i,
-  /\.key$/i,
-  /^id_rsa/i,
-  /^id_ed25519/i,
-  /credentials\.json$/i,
-  /service-account.*\.json$/i,
-];
-
 const MAGIC: Array<{ renderer: RendererType; bytes: number[]; offset?: number }> = [
   { renderer: "pdf", bytes: [0x25, 0x50, 0x44, 0x46] }, // %PDF
   { renderer: "image", bytes: [0xff, 0xd8, 0xff] }, // JPEG
@@ -53,23 +45,14 @@ const MAGIC: Array<{ renderer: RendererType; bytes: number[]; offset?: number }>
   { renderer: "image", bytes: [0x52, 0x49, 0x46, 0x46] }, // WEBP (RIFF…)
 ];
 
-export function sanitizeFilename(name: string): string {
-  const base = name.split(/[/\\]/).pop() ?? "file";
-  return base
-    .replace(/[^\w.\- ()[\]]+/g, "_")
-    .replace(/^\.+/, "")
-    .slice(0, 180) || "file";
-}
+export { sanitizeFilename };
 
 export function assertNotBlockedSecret(filename: string) {
-  const base = filename.split(/[/\\]/).pop() ?? filename;
-  for (const re of BLOCKED_NAMES) {
-    if (re.test(base)) {
-      throw new FileError(
-        "Secret- oder Credential-Dateien sind nicht erlaubt.",
-        "BLOCKED_SECRET"
-      );
-    }
+  if (isBlockedFilename(filename)) {
+    throw new FileError(
+      "Secret- oder Credential-Dateien sind nicht erlaubt.",
+      "BLOCKED_SECRET"
+    );
   }
 }
 
@@ -240,4 +223,103 @@ export async function processUpload(input: {
 
 export function createUploadIntentId(): string {
   return `upl_${randomBytes(12).toString("hex")}`;
+}
+
+/**
+ * Resolve an uploaded file the caller owns.
+ * The storage key is never accepted from a request — it is looked up here.
+ */
+export async function getOwnedFileByPublicId(
+  publicId: string,
+  userId: string
+) {
+  const db = getDb();
+  const [file] = await db
+    .select()
+    .from(files)
+    .where(
+      and(
+        eq(files.publicId, publicId),
+        eq(files.ownerId, userId),
+        isNull(files.deletedAt)
+      )
+    )
+    .limit(1);
+  return file ?? null;
+}
+
+/** Link an uploaded file to the document it was published as. */
+export async function attachFileToDocument(
+  filePublicId: string,
+  documentPublicId: string
+) {
+  const db = getDb();
+  const [doc] = await db
+    .select({ id: documents.id })
+    .from(documents)
+    .where(eq(documents.publicId, documentPublicId))
+    .limit(1);
+  if (!doc) return;
+  await db
+    .update(files)
+    .set({ documentId: doc.id })
+    .where(eq(files.publicId, filePublicId));
+}
+
+/**
+ * Only these types may render inline. Everything else is forced to download,
+ * so uploaded HTML/SVG can never execute on our own origin.
+ */
+const INLINE_CONTENT_TYPES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
+
+const EXTENSION_CONTENT_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+};
+
+/**
+ * Decide how a stored object is served.
+ * `forceDownload` covers the explicit download button; everything not on the
+ * inline allowlist is served as an attachment regardless.
+ */
+export function resolveDelivery(input: {
+  mimeType?: string | null;
+  extension?: string | null;
+  forceDownload?: boolean;
+}): { contentType: string; disposition: "inline" | "attachment" } {
+  const byExtension = input.extension
+    ? EXTENSION_CONTENT_TYPES[input.extension.replace(/^\./, "").toLowerCase()]
+    : undefined;
+  const declared = input.mimeType?.split(";")[0]?.trim().toLowerCase();
+  const contentType =
+    (declared && declared !== "application/octet-stream" ? declared : null) ??
+    byExtension ??
+    "application/octet-stream";
+
+  const inline = !input.forceDownload && INLINE_CONTENT_TYPES.has(contentType);
+  return {
+    contentType,
+    disposition: inline ? "inline" : "attachment",
+  };
+}
+
+/** Content type for a stored object, used by the signed file proxy. */
+export async function getFileByStorageKey(storageKey: string) {
+  const db = getDb();
+  const [file] = await db
+    .select()
+    .from(files)
+    .where(and(eq(files.storageKey, storageKey), isNull(files.deletedAt)))
+    .limit(1);
+  return file ?? null;
 }

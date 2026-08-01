@@ -55,6 +55,46 @@ const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif"]);
 
 const MARKDOWN_EXT = new Set(["md", "markdown", "mdx"]);
 
+/**
+ * Filenames that must never be uploaded, checked on client and server.
+ * Lives here (not in files/service) so the browser can reject them without
+ * pulling in crypto, drizzle and the db connection.
+ */
+export const BLOCKED_FILENAMES = [
+  /^\.env(\.|$)/i,
+  /\.pem$/i,
+  /\.key$/i,
+  /^id_rsa/i,
+  /^id_ed25519/i,
+  /credentials\.json$/i,
+  /service-account.*\.json$/i,
+];
+
+export function isBlockedFilename(filename: string): boolean {
+  const base = filename.split(/[/\\]/).pop() ?? filename;
+  return BLOCKED_FILENAMES.some((re) => re.test(base));
+}
+
+export function sanitizeFilename(name: string): string {
+  const base = name.split(/[/\\]/).pop() ?? "file";
+  return (
+    base
+      .replace(/[^\w.\- ()[\]]+/g, "_")
+      .replace(/^\.+/, "")
+      .slice(0, 180) || "file"
+  );
+}
+
+/** `accept` attribute for every file input — single source of truth. */
+export const ACCEPT_ATTRIBUTE = [
+  ...[...MARKDOWN_EXT].map((e) => `.${e}`),
+  ".txt",
+  ".csv",
+  ".pdf",
+  ...[...IMAGE_EXT].map((e) => `.${e}`),
+  ...[...CODE_EXT].map((e) => `.${e}`),
+].join(",");
+
 /** Extensions free tier may publish as content (PDF/image need storage). */
 export const FREE_UPLOAD_EXTENSIONS = [
   ".md",
@@ -150,4 +190,9 @@ export function isTextBasedRenderer(r: RendererType): boolean {
     r === "csv" ||
     r === "html"
   );
+}
+
+/** Formats that live in object storage instead of the content column. */
+export function isBinaryRenderer(r: RendererType): boolean {
+  return !isTextBasedRenderer(r);
 }

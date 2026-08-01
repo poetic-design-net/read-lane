@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { appConfig } from "@/lib/config";
+import { isTextBasedRenderer } from "@/lib/documents/formats";
 import {
   CONTENT_WIDTHS,
   DOCUMENT_STATUSES,
@@ -29,10 +30,11 @@ export const publishDocumentSchema = z
       .max(appConfig.limits.descriptionMax)
       .optional()
       .nullable(),
+    // Binary documents (pdf, image) carry no text — content lives in storage.
     markdownContent: z
       .string()
-      .min(1, "Dokument darf nicht leer sein")
-      .max(appConfig.limits.markdownMax, "Dokument ist zu groß"),
+      .max(appConfig.limits.markdownMax, "Dokument ist zu groß")
+      .default(""),
     visibility: visibilitySchema.default("unlisted"),
     status: documentStatusSchema.default("published"),
     password: z
@@ -71,6 +73,9 @@ export const publishDocumentSchema = z
         "docx",
       ])
       .optional(),
+    /** publicId of a file uploaded via POST /api/v1/uploads */
+    fileId: z.string().optional().nullable(),
+    allowDownload: z.boolean().default(true),
   })
   .superRefine((data, ctx) => {
     if (data.visibility === "password" && !data.password) {
@@ -78,6 +83,22 @@ export const publishDocumentSchema = z
         code: "custom",
         path: ["password"],
         message: "Passwort ist bei passwortgeschützten Dokumenten erforderlich",
+      });
+    }
+    const needsText =
+      !data.rendererType || isTextBasedRenderer(data.rendererType);
+    if (needsText && !data.markdownContent.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["markdownContent"],
+        message: "Dokument darf nicht leer sein",
+      });
+    }
+    if (!needsText && !data.fileId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fileId"],
+        message: "Für dieses Format wird eine hochgeladene Datei benötigt",
       });
     }
   });
@@ -116,6 +137,7 @@ export const updateDocumentSchema = z.object({
   fontStyle: fontStyleSchema.optional(),
   showTableOfContents: z.boolean().optional(),
   showCodeLineNumbers: z.boolean().optional(),
+  allowDownload: z.boolean().optional(),
   expiryPreset: expiryPresetSchema.optional(),
   customExpiryDate: z.string().optional().nullable(),
   baseVersion: z.number().int().positive().optional(),

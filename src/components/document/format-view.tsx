@@ -2,6 +2,8 @@ import { cn } from "@/lib/utils";
 import type { RendererType } from "@/types/document";
 import { MarkdownView } from "@/components/markdown/markdown-view";
 import { languageFromExtension } from "@/lib/documents/formats";
+import { PdfViewer } from "./pdf-viewer";
+import { ImageView } from "./image-view";
 
 /** Server-safe format display for public document pages. */
 export function FormatView({
@@ -11,6 +13,10 @@ export function FormatView({
   sourceFilename,
   html,
   showLineNumbers,
+  fileUrl,
+  downloadUrl,
+  allowDownload = true,
+  fileSize,
   className,
 }: {
   content: string;
@@ -20,6 +26,11 @@ export function FormatView({
   /** Pre-rendered markdown HTML when renderer is markdown */
   html?: string;
   showLineNumbers?: boolean;
+  /** Short-lived signed URL for binary formats (pdf, image) */
+  fileUrl?: string | null;
+  downloadUrl?: string | null;
+  allowDownload?: boolean;
+  fileSize?: number | null;
   className?: string;
 }) {
   if (rendererType === "markdown" && html) {
@@ -72,30 +83,36 @@ export function FormatView({
     );
   }
 
-  if (rendererType === "pdf") {
+  if (rendererType === "pdf" || rendererType === "image") {
+    if (!fileUrl) {
+      return <MissingFile filename={sourceFilename} className={className} />;
+    }
+    if (rendererType === "image") {
+      return (
+        <ImageView
+          url={fileUrl}
+          filename={sourceFilename}
+          allowDownload={allowDownload}
+          downloadUrl={downloadUrl}
+          className={className}
+        />
+      );
+    }
     return (
-      <div
-        className={cn(
-          "rounded-xl border border-dashed border-stone-200 p-10 text-center text-[14px] text-stone-500",
-          className
-        )}
-      >
-        PDF-Viewer folgt (Originaldatei in Object Storage).
-        {sourceFilename && (
-          <p className="mt-2 font-medium text-stone-700">{sourceFilename}</p>
-        )}
-      </div>
+      <PdfViewer
+        url={fileUrl}
+        filename={sourceFilename}
+        fileSize={fileSize}
+        allowDownload={allowDownload}
+        downloadUrl={downloadUrl}
+        className={className}
+      />
     );
   }
 
-  if (rendererType === "image") {
-    return (
-      <div className={cn("text-center", className)}>
-        <p className="text-[14px] text-stone-500">
-          Bilddarstellung (Object Storage) — Datei: {sourceFilename || "image"}
-        </p>
-      </div>
-    );
+  // Anything left without text (e.g. docx, whose converter is still pending)
+  if (!content.trim()) {
+    return <MissingFile filename={sourceFilename} className={className} />;
   }
 
   // fallback markdown-ish
@@ -107,6 +124,30 @@ export function FormatView({
       )}
     >
       {content}
+    </div>
+  );
+}
+
+function MissingFile({
+  filename,
+  className,
+}: {
+  filename?: string | null;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-dashed border-stone-200 p-10 text-center text-[14px] text-stone-500 dark:border-stone-700",
+        className
+      )}
+    >
+      Diese Datei ist derzeit nicht verfügbar.
+      {filename && (
+        <p className="mt-2 font-medium text-stone-700 dark:text-stone-200">
+          {filename}
+        </p>
+      )}
     </div>
   );
 }
