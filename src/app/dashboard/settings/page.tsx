@@ -8,6 +8,8 @@ import { CliTokensList } from "@/components/dashboard/cli-tokens-list";
 import { ApiTokenForm } from "@/components/dashboard/api-token-form";
 import { getEntitlements } from "@/lib/plans/service";
 import { DomainsPanel } from "@/components/dashboard/domains-panel";
+import { AuditLogList } from "@/components/dashboard/audit-log-list";
+import { listAuditLogs } from "@/lib/audit/service";
 import { listDomains, VERIFICATION_PREFIX } from "@/lib/domains/service";
 import { appConfig } from "@/lib/config";
 
@@ -25,6 +27,11 @@ export default async function SettingsPage() {
     getEntitlements(user.id),
     listDomains(user.id),
   ]);
+
+  // Reading the log is a paid feature, so it is only queried when allowed.
+  const auditEntries = entitlements.auditLog
+    ? await listAuditLogs(user.id, 50)
+    : [];
 
   // Tokens and domains may only be bound to projects the user owns.
   const ownedProjects = projects
@@ -95,6 +102,17 @@ export default async function SettingsPage() {
             projects={ownedProjects}
             enabled={entitlements.customDomains}
             verificationPrefix={VERIFICATION_PREFIX}
+          />
+        </section>
+
+        <section className="mb-10">
+          <h2 className="mb-2 text-[15px] font-medium">Audit Log</h2>
+          <p className="mb-4 text-[13px] text-stone-400">
+            Die letzten sicherheitsrelevanten Ereignisse Ihres Kontos.
+          </p>
+          <AuditLogList
+            entries={auditEntries}
+            enabled={entitlements.auditLog}
           />
         </section>
 

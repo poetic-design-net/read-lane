@@ -31,6 +31,7 @@ export type Entitlements = {
   cliPushAll: boolean;
   apiAccess: boolean;
   teamMembers: boolean;
+  auditLog: boolean;
 
   allowedRendererTypes: RendererType[];
   visibilities: Array<"public" | "unlisted" | "password">;
@@ -53,6 +54,7 @@ export const planLimits: Record<PlanId, Entitlements> = {
     cliPushAll: false,
     apiAccess: false,
     teamMembers: false,
+    auditLog: false,
     allowedRendererTypes: [
       "markdown",
       "text",
@@ -79,6 +81,7 @@ export const planLimits: Record<PlanId, Entitlements> = {
     cliPushAll: true,
     apiAccess: false,
     teamMembers: false,
+    auditLog: false,
     allowedRendererTypes: [
       "markdown",
       "text",
@@ -106,6 +109,7 @@ export const planLimits: Record<PlanId, Entitlements> = {
     cliPushAll: true,
     apiAccess: true,
     teamMembers: true,
+    auditLog: true,
     allowedRendererTypes: [
       "markdown",
       "text",

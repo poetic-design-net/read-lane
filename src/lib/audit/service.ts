@@ -1,3 +1,4 @@
+import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
 import { createHash } from "crypto";
@@ -65,6 +66,23 @@ function sanitizeMetadata(
     out[k] = v;
   }
   return out;
+}
+
+/** Newest first, for the account's own audit view (Business). */
+export async function listAuditLogs(userId: string, limit = 100) {
+  const db = getDb();
+  return db
+    .select({
+      id: auditLogs.id,
+      action: auditLogs.action,
+      actorType: auditLogs.actorType,
+      metadata: auditLogs.metadata,
+      createdAt: auditLogs.createdAt,
+    })
+    .from(auditLogs)
+    .where(eq(auditLogs.userId, userId))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(Math.min(limit, 500));
 }
 
 export async function writeAuditLog(input: {

@@ -1,0 +1,420 @@
+openapi: 3.1.0
+info:
+  title: Readlane API
+  version: "1.0"
+  description: >
+    Public v1 API. Prose documentation lives in docs/API.md. Internal admin
+    routes are intentionally not listed.
+servers:
+  - url: "{appUrl}/api/v1"
+    variables:
+      appUrl:
+        default: https://app.readlane.io
+
+security:
+  - bearerToken: []
+  - sessionCookie: []
+
+components:
+  securitySchemes:
+    bearerToken:
+      type: http
+      scheme: bearer
+      description: CLI and API tokens (`rln_…`). Scopes: full, project_write, project_read.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: readlane_session
+  schemas:
+    Envelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+        meta:
+          type: object
+          properties:
+            requestId:
+              type: string
+    Error:
+      type: object
+      required: [error, meta]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              examples: [PLAN_LIMIT_REACHED]
+            message:
+              type: string
+            details:
+              type: object
+        meta:
+          type: object
+          properties:
+            requestId:
+              type: string
+  responses:
+    Ok:
+      description: Success envelope
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Envelope"
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+paths:
+  /auth/register:
+    post:
+      summary: Create an account
+      security: []
+      responses:
+        "201": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/Error" }
+  /auth/login:
+    post:
+      summary: Start a session
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "401": { $ref: "#/components/responses/Error" }
+  /auth/logout:
+    post:
+      summary: End the session
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+
+  /me:
+    get:
+      summary: Current user, plan and usage
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /account:
+    get:
+      summary: Account details
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    patch:
+      summary: Update account
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    delete:
+      summary: Delete account and content
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /plans:
+    get:
+      summary: Plan catalogue
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /entitlements:
+    get:
+      summary: Effective entitlements
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /usage:
+    get:
+      summary: Documents, projects and storage in use
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+
+  /billing/checkout:
+    post:
+      summary: Start a Stripe checkout session
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "501": { $ref: "#/components/responses/Error" }
+  /billing/portal:
+    post:
+      summary: Open the Stripe customer portal
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /billing/subscription:
+    get:
+      summary: Current subscription
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /billing/select-free-document:
+    post:
+      summary: Pick the document to keep when downgrading to Free
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /webhooks/stripe:
+    post:
+      summary: Stripe webhook (signature auth only)
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /projects:
+    get:
+      summary: Projects owned by or shared with the user
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    post:
+      summary: Create a project
+      responses:
+        "201": { $ref: "#/components/responses/Ok" }
+        "402": { $ref: "#/components/responses/Error" }
+  /projects/{projectId}:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Project details
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    patch:
+      summary: Update project settings
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    delete:
+      summary: Archive a project
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /projects/{projectId}/documents:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Documents in a project
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    post:
+      summary: Publish a document into a project
+      responses:
+        "201": { $ref: "#/components/responses/Ok" }
+  /projects/{projectId}/members:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: List members
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    post:
+      summary: Add an existing account as editor or viewer
+      responses:
+        "201": { $ref: "#/components/responses/Ok" }
+        "402": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /projects/{projectId}/members/{memberId}:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: memberId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      summary: Change a member's role
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    delete:
+      summary: Remove a member
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+
+  /documents:
+    get:
+      summary: List documents
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    post:
+      summary: Publish a document
+      responses:
+        "201": { $ref: "#/components/responses/Ok" }
+        "402": { $ref: "#/components/responses/Error" }
+  /documents/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Document details
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+    put:
+      summary: Update a document (optimistic locking via baseVersion)
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "409": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a document
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /documents/{id}/publish:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Publish a draft
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /documents/{id}/archive:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Archive a document
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /documents/{id}/management-url:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Signed management link
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /documents/{id}/versions:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Version history
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "402": { $ref: "#/components/responses/Error" }
+  /documents/{id}/versions/{version}/restore:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: version
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      summary: Restore a version
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+
+  /uploads:
+    post:
+      summary: Upload a file (multipart, field "file")
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                documentId:
+                  type: string
+      responses:
+        "201": { $ref: "#/components/responses/Ok" }
+        "400": { $ref: "#/components/responses/Error" }
+        "402": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /files/signed:
+    get:
+      summary: Signed read proxy for stored objects
+      security: []
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema: { type: string }
+        - name: exp
+          in: query
+          required: true
+          schema: { type: integer }
+        - name: sig
+          in: query
+          required: true
+          schema: { type: string }
+        - name: download
+          in: query
+          schema: { type: string, enum: ["1"] }
+      responses:
+        "200":
+          description: File stream
+        "400": { $ref: "#/components/responses/Error" }
+
+  /shares/{shareId}:
+    parameters:
+      - name: shareId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Public document payload
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "404": { $ref: "#/components/responses/Error" }
+        "410": { $ref: "#/components/responses/Error" }
+  /shares/{shareId}/unlock:
+    parameters:
+      - name: shareId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Exchange a password for an unlock session
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /cli/device:
+    post:
+      summary: Start the device flow
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /cli/device/token:
+    post:
+      summary: Poll the device flow
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "202": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /cli/token:
+    get:
+      summary: List active tokens
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /cli/token/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      summary: Revoke a token
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
