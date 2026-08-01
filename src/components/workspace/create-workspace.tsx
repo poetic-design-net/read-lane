@@ -17,8 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { LivePreview } from "@/components/editor/live-preview";
 import { PublishDialog } from "@/components/editor/publish-dialog";
+import { useFileIntake } from "@/components/editor/use-file-intake";
+import { FormatView } from "@/components/document/format-view";
+import { ACCEPT_ATTRIBUTE, isProseRenderer } from "@/lib/documents/formats";
 import { EXAMPLE_MARKDOWN } from "@/lib/markdown/example";
 import { appConfig } from "@/lib/config";
+import { planLimits } from "@/lib/plans/config";
 import { publishDocumentAction } from "@/app/actions/documents";
 import { StatusPill, statusFromDocument } from "@/components/design/status-pill";
 import { SharePanel } from "./share-panel";
@@ -39,6 +43,11 @@ const defaultState: EditorDocumentState = {
   showCodeLineNumbers: false,
   expiryPreset: "never",
   customExpiryDate: "",
+  rendererType: "markdown",
+  fileId: null,
+  sourceFilename: null,
+  previewUrl: null,
+  fileSize: null,
 };
 
 type PublishResult = {
@@ -47,6 +56,49 @@ type PublishResult = {
   managementToken: string;
   publicId: string;
 };
+
+const RENDERER_LABELS: Record<string, string> = {
+  pdf: "PDF",
+  image: "Bild",
+  docx: "Word-Dokument",
+};
+
+function UploadedFileCard({
+  filename,
+  rendererType,
+  fileSize,
+  onClear,
+}: {
+  filename?: string | null;
+  rendererType: string;
+  fileSize?: number | null;
+  onClear?: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-4 py-3.5 dark:border-stone-800 dark:bg-stone-900/40">
+      <FileText className="size-4 shrink-0 text-stone-400" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-medium text-stone-800 dark:text-stone-100">
+          {filename || "Datei"}
+        </p>
+        <p className="text-[11px] text-stone-400">
+          {RENDERER_LABELS[rendererType] ?? rendererType}
+          {fileSize ? ` · ${Math.max(1, Math.round(fileSize / 1024))} KB` : ""}
+        </p>
+      </div>
+      {onClear && (
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          onClick={onClear}
+          aria-label="Datei entfernen"
+        >
+          <Trash2 />
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function readPendingUpload(projectId?: string | null): EditorDocumentState {
   const base = { ...defaultState, projectId };
@@ -101,6 +153,7 @@ export function CreateWorkspace({
   const [result, setResult] = useState<PublishResult | null>(null);
   const [showShare, setShowShare] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { pickFile, uploading } = useFileIntake(plan);
 
   const update = useCallback((patch: Partial<EditorDocumentState>) => {
     setState((s) => ({ ...s, ...patch }));
@@ -113,59 +166,23 @@ export function CreateWorkspace({
     setState({ ...defaultState, projectId: projectId ?? null });
   }, [projectId]);
 
-  const validateFile = (file: File): string | null => {
-    const name = file.name.toLowerCase();
-    const allowed = [
-      ...appConfig.allowedExtensions,
-      ".mdx",
-      ".csv",
-      ".js",
-      ".ts",
-      ".jsx",
-      ".tsx",
-      ".css",
-      ".json",
-      ".yaml",
-      ".yml",
-      ".py",
-      ".go",
-      ".rs",
-      ".sh",
-      ".sql",
-      ".html",
-      ".htm",
-    ];
-    const ok = allowed.some((ext) => name.endsWith(ext));
-    if (!ok) {
-      return "Dieses Format wird noch nicht unterstützt.";
-    }
-    if (file.size > appConfig.maxFileSizeBytes) {
-      return `Datei ist zu groß (max. ${Math.round(appConfig.maxFileSizeBytes / 1024 / 1024)} MB).`;
-    }
-    return null;
-  };
-
   const loadFile = async (file: File) => {
-    const err = validateFile(file);
-    if (err) {
-      toast.error(err);
-      return;
-    }
-    const text = await file.text();
-    if (!text.trim()) {
-      toast.error("Die Datei ist leer.");
-      return;
-    }
-    const baseTitle = file.name.replace(/\.(md|markdown|txt)$/i, "");
+    const intake = await pickFile(file);
+    if (!intake) return;
     if (result) {
       setResult(null);
       setShowShare(false);
     }
     setState((s) => ({
       ...s,
-      markdownContent: text,
-      title: baseTitle,
+      markdownContent: intake.markdownContent,
+      title: intake.title,
       description: "",
+      rendererType: intake.rendererType,
+      fileId: intake.fileId,
+      sourceFilename: intake.sourceFilename,
+      previewUrl: intake.previewUrl,
+      fileSize: intake.fileSize,
     }));
     toast.success("Datei geladen");
   };
@@ -178,7 +195,7 @@ export function CreateWorkspace({
   };
 
   const handlePublish = async (opts?: { replace?: boolean }) => {
-    if (!state.markdownContent.trim()) {
+    if (!state.markdownContent.trim() && !state.fileId) {
       toast.error("Dokument darf nicht leer sein.");
       return;
     }
@@ -218,6 +235,9 @@ export function CreateWorkspace({
         customExpiryDate: state.customExpiryDate || null,
         projectId: plan === "free" ? null : state.projectId,
         replaceActive: doReplace,
+        rendererType: state.rendererType,
+        fileId: state.fileId ?? null,
+        sourceFilename: state.sourceFilename ?? null,
       });
       if (!res.ok || !res.data) {
         if (res.ok === false && res.error.includes("Pro")) {
@@ -251,7 +271,10 @@ export function CreateWorkspace({
     }
   };
 
-  const hasContent = Boolean(state.markdownContent.trim());
+  // Uploaded formats (pdf, image, docx) are not edited as text — the file is
+  // the document.
+  const isUpload = Boolean(state.fileId);
+  const hasContent = Boolean(state.markdownContent.trim()) || isUpload;
   const statusKind = result
     ? statusFromDocument({
         status: state.status,
@@ -278,7 +301,7 @@ export function CreateWorkspace({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              accept={ACCEPT_ATTRIBUTE}
               className="sr-only"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -289,10 +312,11 @@ export function CreateWorkspace({
             <Button
               size="sm"
               className="h-9 rounded-full"
+              disabled={uploading}
               onClick={() => fileInputRef.current?.click()}
             >
               <Plus data-icon="inline-start" />
-              Dokument hochladen
+              {uploading ? "Wird geladen…" : "Dokument hochladen"}
             </Button>
             {!result && !hasContent && (
               <Button
@@ -390,6 +414,28 @@ export function CreateWorkspace({
                 </Button>
               )}
             </div>
+            {isUpload ? (
+              <UploadedFileCard
+                filename={state.sourceFilename}
+                rendererType={state.rendererType ?? "markdown"}
+                fileSize={state.fileSize}
+                onClear={
+                  result
+                    ? undefined
+                    : () =>
+                        update({
+                          markdownContent: "",
+                          title: "",
+                          description: "",
+                          rendererType: "markdown",
+                          fileId: null,
+                          sourceFilename: null,
+                          previewUrl: null,
+                          fileSize: null,
+                        })
+                }
+              />
+            ) : (
             <Textarea
               autoFocus
               value={state.markdownContent}
@@ -404,6 +450,7 @@ export function CreateWorkspace({
               onDrop={onDrop}
               readOnly={Boolean(result)}
             />
+            )}
             {result && (
               <div className="mt-3 rounded-xl bg-stone-50 px-3.5 py-3 text-[12px] leading-relaxed text-stone-600 ring-1 ring-stone-100 dark:bg-stone-900 dark:text-stone-300 dark:ring-stone-800">
                 <p className="font-medium text-stone-800 dark:text-stone-100">
@@ -481,8 +528,8 @@ export function CreateWorkspace({
               oder klicken zum Auswählen
             </p>
             <p className="mt-2 text-[10px] text-stone-300">
-              .md, .markdown, .txt bis{" "}
-              {Math.round(appConfig.maxFileSizeBytes / 1024 / 1024)} MB
+              Markdown, Text, Code, CSV, PDF, Bilder, Word bis{" "}
+              {Math.round(planLimits[plan].maxFileSizeBytes / 1024 / 1024)} MB
             </p>
           </button>
         </div>
@@ -526,7 +573,26 @@ export function CreateWorkspace({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5 lg:p-6">
-          {hasContent ? (
+          {isUpload ? (
+            isProseRenderer(state.rendererType ?? "markdown") ? (
+              // DOCX arrives as unsanitized HTML — sanitizing runs server-side
+              // on the public page, so the editor only summarizes it here.
+              <p className="text-[13px] leading-relaxed text-stone-500">
+                {state.sourceFilename} wird als formatiertes Dokument
+                veröffentlicht. Überschriften, Listen und Tabellen bleiben
+                erhalten; eingebettete Bilder nicht.
+              </p>
+            ) : (
+              <FormatView
+                content=""
+                rendererType={state.rendererType ?? "markdown"}
+                sourceFilename={state.sourceFilename}
+                fileUrl={state.previewUrl}
+                fileSize={state.fileSize}
+                allowDownload={false}
+              />
+            )
+          ) : hasContent ? (
             <div className="grid grid-cols-[88px_1fr] gap-5 xl:grid-cols-[100px_1fr]">
               <nav className="text-[12px]" aria-label="Inhalt">
                 <p className="mb-2 font-medium uppercase tracking-[0.12em] text-stone-400">

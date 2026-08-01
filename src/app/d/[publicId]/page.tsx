@@ -8,7 +8,7 @@ import {
   getPublicDocumentView,
 } from "@/lib/documents/service";
 import { hasUnlockSession } from "@/lib/security/session";
-import { renderMarkdown } from "@/lib/markdown/render";
+import { renderHtmlDocument, renderMarkdown } from "@/lib/markdown/render";
 import { TableOfContents } from "@/components/markdown/toc";
 import { PasswordForm } from "@/components/document/password-form";
 import { DocumentToolbar } from "@/components/document/document-toolbar";
@@ -123,7 +123,10 @@ export default async function DocumentPage({ params }: PageProps) {
     ? await renderMarkdown(document.markdownContent, {
         showLineNumbers: document.showCodeLineNumbers,
       })
-    : { html: "", toc: [] as { id: string; text: string; level: number }[] };
+    : document.rendererType === "docx"
+      ? // DOCX is stored as the converter's raw HTML — sanitized here, like markdown.
+        await renderHtmlDocument(document.markdownContent)
+      : { html: "", toc: [] as { id: string; text: string; level: number }[] };
 
   // Binary formats live in object storage. The page is force-dynamic, so every
   // visit mints a fresh short-lived URL instead of exposing a permanent one.

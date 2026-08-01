@@ -23,6 +23,7 @@ import type {
   ContentWidth,
   DocumentStatus,
   FontStyle,
+  RendererType,
   Theme,
   Visibility,
 } from "@/types/document";
@@ -49,6 +50,13 @@ export interface EditorDocumentState {
   expiryPreset: "never" | "24h" | "7d" | "30d" | "custom";
   customExpiryDate: string;
   projectId?: string | null;
+  /** Set for uploaded formats — text stays "markdown" with no file attached. */
+  rendererType?: RendererType;
+  fileId?: string | null;
+  sourceFilename?: string | null;
+  /** Short-lived URL for previewing pdf/image before publishing. */
+  previewUrl?: string | null;
+  fileSize?: number | null;
 }
 
 const defaultState: EditorDocumentState = {

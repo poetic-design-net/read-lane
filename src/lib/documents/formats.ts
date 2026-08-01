@@ -91,6 +91,7 @@ export const ACCEPT_ATTRIBUTE = [
   ".txt",
   ".csv",
   ".pdf",
+  ".docx",
   ...[...IMAGE_EXT].map((e) => `.${e}`),
   ...[...CODE_EXT].map((e) => `.${e}`),
 ].join(",");
@@ -195,4 +196,12 @@ export function isTextBasedRenderer(r: RendererType): boolean {
 /** Formats that live in object storage instead of the content column. */
 export function isBinaryRenderer(r: RendererType): boolean {
   return !isTextBasedRenderer(r);
+}
+
+/**
+ * Formats displayed as rendered prose. Markdown is stored as markdown, DOCX as
+ * the HTML mammoth produced — both end up in the same view.
+ */
+export function isProseRenderer(r: RendererType): boolean {
+  return r === "markdown" || r === "docx";
 }

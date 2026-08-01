@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { apiError, apiOk, createRequestId } from "@/lib/api/errors";
 import { requireAuth, ApiAuthError } from "@/lib/api/auth-context";
 import { FileError, processUpload } from "@/lib/files/service";
-import { isBinaryRenderer } from "@/lib/documents/formats";
 import { getStorage } from "@/lib/storage";
 import { PlanError } from "@/lib/plans/service";
 import { checkRateLimit } from "@/lib/security/rate-limit";
@@ -60,10 +59,15 @@ export async function POST(req: NextRequest) {
           : null,
     });
 
-    // Short-lived preview URL so the editor can show binary formats before publishing
-    const previewUrl = isBinaryRenderer(result.rendererType)
-      ? await getStorage().getSignedReadUrl(result.storageKey, PREVIEW_TTL_SECONDS)
-      : null;
+    // Short-lived preview URL for formats without text (pdf, image) so the
+    // editor can show them before publishing. DOCX carries converted HTML.
+    const previewUrl =
+      result.content === null
+        ? await getStorage().getSignedReadUrl(
+            result.storageKey,
+            PREVIEW_TTL_SECONDS
+          )
+        : null;
 
     return apiOk(
       {

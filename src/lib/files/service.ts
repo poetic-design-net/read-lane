@@ -13,6 +13,7 @@ import {
   sanitizeFilename,
   type RendererType,
 } from "@/lib/documents/formats";
+import { convertDocxToHtml, isZipContainer } from "@/lib/documents/docx";
 import {
   assertCanUseRenderer,
   assertWithinFileSize,
@@ -125,13 +126,37 @@ export async function processUpload(input: {
     }
   }
 
-  if (rendererType === "docx") {
-    // Phase 2: store + job only
+  if (rendererType === "docx" && !isZipContainer(input.data)) {
+    throw new FileError(
+      "Datei ist kein gültiges Word-Dokument.",
+      "INVALID_FILE_CONTENT"
+    );
   }
 
   await assertCanUseRenderer(input.userId, rendererType);
   await assertWithinFileSize(input.userId, input.data.length);
   await assertWithinStorageLimit(input.userId, input.data.length);
+
+  // Convert before anything is stored, so a broken document leaves no orphans.
+  // Inline because mammoth stays well under a second for normal documents.
+  // ponytail: move to processing_jobs once a real file trips the function timeout.
+  let docxHtml: string | null = null;
+  if (rendererType === "docx") {
+    try {
+      docxHtml = await convertDocxToHtml(input.data);
+    } catch {
+      throw new FileError(
+        "Word-Dokument konnte nicht gelesen werden.",
+        "INVALID_FILE_CONTENT"
+      );
+    }
+    if (!docxHtml) {
+      throw new FileError(
+        "Word-Dokument enthält keinen Text.",
+        "INVALID_FILE_CONTENT"
+      );
+    }
+  }
 
   const db = getDb();
   const [user] = await db
@@ -210,6 +235,8 @@ export async function processUpload(input: {
         .replace(/^import\s.+$/gm, "")
         .replace(/^export\s.+$/gm, "");
     }
+  } else if (rendererType === "docx") {
+    content = docxHtml;
   }
 
   return {

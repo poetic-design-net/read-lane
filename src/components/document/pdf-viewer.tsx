@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Download, ExternalLink, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -104,20 +104,18 @@ export function PdfViewer({
  * desktop) instead of a fallback that flashes away.
  */
 function useEmbeddedPdfSupport(): boolean | undefined {
-  const [supported, setSupported] = useState<boolean | undefined>(undefined);
+  return useSyncExternalStore(neverChanges, detectPdfSupport, () => undefined);
+}
 
-  useEffect(() => {
-    // navigator.pdfViewerEnabled is the standardized signal; where it is
-    // missing, a coarse pointer is the reliable proxy for mobile browsers.
-    const nav = navigator as Navigator & { pdfViewerEnabled?: boolean };
-    if (typeof nav.pdfViewerEnabled === "boolean") {
-      setSupported(nav.pdfViewerEnabled);
-      return;
-    }
-    setSupported(!window.matchMedia("(pointer: coarse)").matches);
-  }, []);
+/** The capability cannot change during a visit, so there is nothing to watch. */
+const neverChanges = () => () => {};
 
-  return supported;
+function detectPdfSupport(): boolean {
+  // navigator.pdfViewerEnabled is the standardized signal; where it is
+  // missing, a coarse pointer is the reliable proxy for mobile browsers.
+  const nav = navigator as Navigator & { pdfViewerEnabled?: boolean };
+  if (typeof nav.pdfViewerEnabled === "boolean") return nav.pdfViewerEnabled;
+  return !window.matchMedia("(pointer: coarse)").matches;
 }
 
 function formatBytes(bytes: number): string {

@@ -1,7 +1,10 @@
 import { cn } from "@/lib/utils";
 import type { RendererType } from "@/types/document";
 import { MarkdownView } from "@/components/markdown/markdown-view";
-import { languageFromExtension } from "@/lib/documents/formats";
+import {
+  isProseRenderer,
+  languageFromExtension,
+} from "@/lib/documents/formats";
 import { PdfViewer } from "./pdf-viewer";
 import { ImageView } from "./image-view";
 
@@ -33,7 +36,7 @@ export function FormatView({
   fileSize?: number | null;
   className?: string;
 }) {
-  if (rendererType === "markdown" && html) {
+  if (isProseRenderer(rendererType) && html) {
     return <MarkdownView html={html} className={className} />;
   }
 
@@ -110,7 +113,6 @@ export function FormatView({
     );
   }
 
-  // Anything left without text (e.g. docx, whose converter is still pending)
   if (!content.trim()) {
     return <MissingFile filename={sourceFilename} className={className} />;
   }

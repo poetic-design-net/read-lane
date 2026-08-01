@@ -2,6 +2,7 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
+import rehypeParse from "rehype-parse";
 import rehypeSlug from "rehype-slug";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
@@ -154,6 +155,23 @@ export async function renderMarkdown(
   html = await highlightCodeBlocksInHtml(html, showLineNumbers);
 
   return { html, toc };
+}
+
+/**
+ * Untrusted HTML → safe HTML, through the same schema as markdown.
+ * Used for DOCX, whose conversion produces HTML instead of markdown.
+ */
+export async function renderHtmlDocument(html: string): Promise<RenderResult> {
+  const toc: TocItem[] = [];
+  const file = await unified()
+    .use(rehypeParse, { fragment: true })
+    .use(rehypeSlug)
+    .use(rehypeCollectToc, toc)
+    .use(rehypeSanitize, markdownSanitizeSchema)
+    .use(rehypeStringify)
+    .process(html);
+
+  return { html: String(file), toc };
 }
 
 async function highlightCodeBlocksInHtml(

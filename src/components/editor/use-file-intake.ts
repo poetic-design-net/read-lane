@@ -28,8 +28,9 @@ export interface IntakeResult {
  * Single entry point for picking a file, shared by every upload surface.
  *
  * Text formats are read locally so they stay editable and cost no storage
- * quota. Binary formats go straight to /api/v1/uploads, which validates magic
- * bytes and plan limits server-side; only the file's publicId comes back.
+ * quota. Everything else goes to /api/v1/uploads, which validates magic bytes
+ * and plan limits server-side and converts DOCX; only the file's publicId
+ * comes back.
  */
 export function useFileIntake(plan: PlanId = "free") {
   const [uploading, setUploading] = useState(false);
@@ -50,11 +51,6 @@ export function useFileIntake(plan: PlanId = "free") {
       }
 
       const rendererType = detectRenderer(file.name, file.type);
-      if (rendererType === "docx") {
-        toast.error("Word-Dokumente werden noch nicht unterstützt.");
-        return null;
-      }
-
       const title = stripExtension(file.name);
 
       if (isTextBasedRenderer(rendererType)) {
