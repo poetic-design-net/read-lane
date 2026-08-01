@@ -72,24 +72,30 @@ export function ExamplePicker({
 
       let created = 0;
       for (const example of chosen) {
-        const intake = example.url ? await upload(example) : null;
-        if (example.url && !intake) continue;
+        // Each example stands on its own — one that fails must not take the
+        // rest of the selection down with it.
+        try {
+          const intake = example.url ? await upload(example) : null;
+          if (example.url && !intake) continue;
 
-        const res = await publishDocumentAction({
-          title: example.title,
-          markdownContent: intake?.markdownContent ?? example.content ?? "",
-          visibility: "unlisted",
-          status: "published",
-          rendererType: example.rendererType,
-          fileId: intake?.fileId ?? null,
-          sourceFilename: example.filename,
-          projectId: projectId ?? null,
-        });
-        if (!res.ok) {
-          toast.error(`${example.label}: ${res.error}`);
-          continue;
+          const res = await publishDocumentAction({
+            title: example.title,
+            markdownContent: intake?.markdownContent ?? example.content ?? "",
+            visibility: "unlisted",
+            status: "published",
+            rendererType: example.rendererType,
+            fileId: intake?.fileId ?? null,
+            sourceFilename: example.filename,
+            projectId: projectId ?? null,
+          });
+          if (!res.ok) {
+            toast.error(`${example.label}: ${res.error}`);
+            continue;
+          }
+          created += 1;
+        } catch {
+          toast.error(`${example.label} konnte nicht geladen werden`);
         }
-        created += 1;
       }
 
       if (created > 0) {
@@ -100,7 +106,11 @@ export function ExamplePicker({
         );
         setSelected([]);
         setOpen(false);
-        router.refresh();
+        // The documents live in the workspace, not in this editor — without
+        // this the page just sits there and the toast looks like a lie.
+        router.push(
+          projectId ? `/dashboard/projects/${projectId}` : "/dashboard"
+        );
       }
     } catch {
       toast.error("Beispiel konnte nicht geladen werden");
