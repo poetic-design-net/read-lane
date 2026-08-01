@@ -20,6 +20,7 @@ export class CliAuthError extends Error {
       | "INVALID"
       | "REVOKED"
       | "UNAUTHORIZED"
+      | "FORBIDDEN_SCOPE"
   ) {
     super(message);
     this.name = "CliAuthError";
@@ -142,13 +143,55 @@ export async function pollDeviceCode(deviceCode: string) {
   throw new CliAuthError("Ungültiger Status", "INVALID");
 }
 
-export async function authenticateBearer(authorization: string | null) {
-  if (!authorization?.startsWith("Bearer ")) {
+export type TokenScope =
+  | "full"
+  | "project_read"
+  | "project_write"
+  | "project_publish";
+
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** Read-only tokens may not change anything, whatever the endpoint does. */
+export function assertScopeAllowsMethod(scope: TokenScope, method: string) {
+  if (scope === "project_read" && !READ_METHODS.has(method.toUpperCase())) {
+    throw new CliAuthError(
+      "Dieser Token darf nur lesen.",
+      "FORBIDDEN_SCOPE"
+    );
+  }
+}
+
+/**
+ * A project-scoped token may only touch its own project. A resource without a
+ * project (`null`) is out of reach for such a token as well. Session auth
+ * passes no scope and is never restricted here.
+ */
+export function assertScopeAllowsProject(
+  scope: string | null | undefined,
+  tokenProjectId: string | null | undefined,
+  targetProjectId: string | null
+) {
+  if (!scope || scope === "full" || !tokenProjectId) return;
+  if (targetProjectId !== tokenProjectId) {
+    throw new CliAuthError(
+      "Dieser Token gilt nur für ein anderes Projekt.",
+      "FORBIDDEN_SCOPE"
+    );
+  }
+}
+
+export async function authenticateBearer(req: {
+  headers: { get(name: string): string | null };
+  method?: string;
+}) {
+  const authorization = req.headers.get("authorization");
+  if (!authorization?.toLowerCase().startsWith("bearer ")) {
     throw new CliAuthError("Missing token", "UNAUTHORIZED");
   }
-  // Also support READLANE_TOKEN via raw value without Bearer when passed directly
   const token = authorization.slice("Bearer ".length).trim();
-  return authenticateCliToken(token);
+  const auth = await authenticateCliToken(token);
+  assertScopeAllowsMethod(auth.scope, req.method ?? "GET");
+  return auth;
 }
 
 export async function authenticateCliToken(token: string) {
@@ -230,6 +273,35 @@ export async function revokeCliToken(userId: string, tokenPublicId: string) {
     .update(cliTokens)
     .set({ revokedAt: new Date() })
     .where(eq(cliTokens.id, rows[0].id));
+}
+
+/**
+ * CI/API token. Same storage as CLI tokens — the spec's separate apiTokens
+ * table would hold the exact same columns.
+ */
+export async function createApiToken(input: {
+  userId: string;
+  name: string;
+  /** Internal project id, or null for an account-wide token. */
+  projectId?: string | null;
+  scope: TokenScope;
+  expiresInDays?: number | null;
+}) {
+  const plain = createCliTokenPlain();
+  const publicId = createCliTokenPublicId();
+  const db = getDb();
+  await db.insert(cliTokens).values({
+    publicId,
+    userId: input.userId,
+    tokenHash: sha256(plain),
+    name: input.name,
+    projectId: input.projectId ?? null,
+    scope: input.scope,
+    expiresAt: input.expiresInDays
+      ? new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)
+      : null,
+  });
+  return { publicId, token: plain };
 }
 
 export async function createProjectScopedToken(input: {

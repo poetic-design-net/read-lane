@@ -49,7 +49,13 @@ export async function POST(req: NextRequest) {
     return apiOk(session, 200, requestId);
   } catch (e) {
     if (e instanceof ApiAuthError) {
-      return apiError("UNAUTHENTICATED", e.message, 401, {}, requestId);
+      return apiError(
+        e.status === 403 ? "FORBIDDEN" : "UNAUTHENTICATED",
+        e.message,
+        e.status,
+        {},
+        requestId
+      );
     }
     if (e instanceof BillingError) {
       return apiError(

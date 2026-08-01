@@ -87,7 +87,13 @@ export async function POST(req: NextRequest) {
     );
   } catch (e) {
     if (e instanceof ApiAuthError) {
-      return apiError("UNAUTHENTICATED", e.message, 401, {}, requestId);
+      return apiError(
+        e.status === 403 ? "FORBIDDEN" : "UNAUTHENTICATED",
+        e.message,
+        e.status,
+        {},
+        requestId
+      );
     }
     if (e instanceof PlanError) {
       const code =

@@ -8,7 +8,7 @@ import { appConfig } from "@/lib/config";
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const projects = await listProjectsForUser(auth.userId);
     return apiOk({
       projects: projects.map((p) => ({
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   if (!rl.success) return apiError("RATE_LIMITED", "Too many requests", 429);
 
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const body = await req.json();
     const parsed = projectCreateSchema.safeParse(body);
     if (!parsed.success) {

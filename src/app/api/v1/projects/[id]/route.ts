@@ -1,6 +1,10 @@
 import { NextRequest } from "next/server";
 import { apiError, apiOk } from "@/lib/api/errors";
-import { authenticateBearer, CliAuthError } from "@/lib/cli/tokens";
+import {
+  assertScopeAllowsProject,
+  authenticateBearer,
+  CliAuthError,
+} from "@/lib/cli/tokens";
 import {
   assertProjectAccess,
   ProjectError,
@@ -14,9 +18,10 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const { id } = await ctx.params;
     const project = await assertProjectAccess(id, auth.userId, "viewer");
+    assertScopeAllowsProject(auth.scope, auth.projectId, project.id);
     const documentCount = await countDocuments(project.id);
     return apiOk({
       project: {
@@ -51,8 +56,10 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const { id } = await ctx.params;
+    // Project settings are owner territory — CI tokens stay out.
+    assertScopeAllowsProject(auth.scope, auth.projectId, null);
     const body = await req.json();
     const parsed = projectUpdateSchema.safeParse(body);
     if (!parsed.success) {

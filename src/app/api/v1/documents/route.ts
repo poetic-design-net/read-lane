@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { apiError, apiOk, createRequestId } from "@/lib/api/errors";
 import { requireAuth, ApiAuthError } from "@/lib/api/auth-context";
+import { assertScopeAllowsProject, CliAuthError } from "@/lib/cli/tokens";
 import {
   createDocument,
   DocumentError,
@@ -18,7 +19,9 @@ export async function GET(req: NextRequest) {
     const auth = await requireAuth(req);
     const { searchParams } = new URL(req.url);
     const docs = await listDocumentsForUser(auth.userId, {
-      projectId: searchParams.get("projectId") ?? undefined,
+      // A project-scoped token never sees beyond its project.
+      projectId:
+        auth.tokenProjectId ?? searchParams.get("projectId") ?? undefined,
       status: searchParams.get("status") ?? undefined,
       visibility: searchParams.get("visibility") ?? undefined,
       q: searchParams.get("q") ?? undefined,
@@ -27,7 +30,16 @@ export async function GET(req: NextRequest) {
     return apiOk({ documents: docs }, 200, requestId);
   } catch (e) {
     if (e instanceof ApiAuthError) {
-      return apiError("UNAUTHENTICATED", e.message, 401, {}, requestId);
+      return apiError(
+        e.status === 403 ? "FORBIDDEN" : "UNAUTHENTICATED",
+        e.message,
+        e.status,
+        {},
+        requestId
+      );
+    }
+    if (e instanceof CliAuthError) {
+      return apiError("FORBIDDEN", e.message, 403, {}, requestId);
     }
     return apiError("INTERNAL_ERROR", "Unexpected error", 500, {}, requestId);
   }
@@ -51,6 +63,13 @@ export async function POST(req: NextRequest) {
         requestId
       );
     }
+
+    // Loose documents are out of reach for a project-scoped token.
+    assertScopeAllowsProject(
+      auth.scope,
+      auth.tokenProjectId,
+      parsed.data.projectId ?? null
+    );
 
     const result = await createDocument(parsed.data, {
       userId: auth.userId,
@@ -94,7 +113,16 @@ export async function POST(req: NextRequest) {
 
   } catch (e) {
     if (e instanceof ApiAuthError) {
-      return apiError("UNAUTHENTICATED", e.message, 401, {}, requestId);
+      return apiError(
+        e.status === 403 ? "FORBIDDEN" : "UNAUTHENTICATED",
+        e.message,
+        e.status,
+        {},
+        requestId
+      );
+    }
+    if (e instanceof CliAuthError) {
+      return apiError("FORBIDDEN", e.message, 403, {}, requestId);
     }
     if (e instanceof PlanError) {
       return apiError(

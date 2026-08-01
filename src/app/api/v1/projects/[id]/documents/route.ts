@@ -1,7 +1,11 @@
 import { NextRequest } from "next/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { apiError, apiOk } from "@/lib/api/errors";
-import { authenticateBearer, CliAuthError } from "@/lib/cli/tokens";
+import {
+  assertScopeAllowsProject,
+  authenticateBearer,
+  CliAuthError,
+} from "@/lib/cli/tokens";
 import { assertProjectAccess, ProjectError } from "@/lib/projects/service";
 import { createDocument, DocumentError } from "@/lib/documents/service";
 import { publishDocumentSchema } from "@/lib/validation/document";
@@ -17,9 +21,10 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const { id } = await ctx.params;
     const project = await assertProjectAccess(id, auth.userId, "viewer");
+    assertScopeAllowsProject(auth.scope, auth.projectId, project.id);
     const db = getDb();
     const rows = await db
       .select()
@@ -57,9 +62,10 @@ export async function POST(
   if (!rl.success) return apiError("RATE_LIMITED", "Too many requests", 429);
 
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const { id } = await ctx.params;
     const project = await assertProjectAccess(id, auth.userId, "editor");
+    assertScopeAllowsProject(auth.scope, auth.projectId, project.id);
     const body = await req.json();
 
     const parsed = publishDocumentSchema.safeParse({

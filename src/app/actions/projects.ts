@@ -8,20 +8,27 @@ import {
   ProjectError,
   updateProject,
 } from "@/lib/projects/service";
+import { assertProjectAccess } from "@/lib/projects/service";
+import { writeAuditLog } from "@/lib/audit/service";
 import {
   addProjectMember,
   removeProjectMember,
   updateProjectMemberRole,
   type ProjectMember,
 } from "@/lib/projects/members";
-import { assertCanUseProjects, PlanError } from "@/lib/plans/service";
+import {
+  assertCanUseProjects,
+  assertPlanFeature,
+  PlanError,
+} from "@/lib/plans/service";
 import {
   addMemberSchema,
+  apiTokenCreateSchema,
   memberRoleSchema,
   projectCreateSchema,
   projectUpdateSchema,
 } from "@/lib/validation/document";
-import { revokeCliToken } from "@/lib/cli/tokens";
+import { createApiToken, revokeCliToken } from "@/lib/cli/tokens";
 import type { ActionResult } from "./auth";
 
 export async function createProjectAction(
@@ -145,6 +152,63 @@ function memberErrorMessage(e: unknown, verb: string): string {
   if (e instanceof ProjectError) return e.message;
   if (e instanceof PlanError) return e.message;
   return `${verb} fehlgeschlagen`;
+}
+
+/**
+ * Business feature: long-lived tokens for CI and API clients. Project-scoped
+ * tokens are restricted to that project server-side.
+ */
+export async function createApiTokenAction(
+  input: unknown
+): Promise<ActionResult<{ token: string; publicId: string }>> {
+  const user = await requireUser();
+  const parsed = apiTokenCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe",
+    };
+  }
+
+  try {
+    await assertPlanFeature(user.id, "apiAccess");
+
+    let projectId: string | null = null;
+    if (parsed.data.projectId) {
+      const project = await assertProjectAccess(
+        parsed.data.projectId,
+        user.id,
+        "owner"
+      );
+      projectId = project.id;
+    }
+    if (!projectId && parsed.data.scope !== "full") {
+      return { ok: false, error: "Für diesen Scope ist ein Projekt nötig" };
+    }
+
+    const created = await createApiToken({
+      userId: user.id,
+      name: parsed.data.name,
+      projectId,
+      scope: parsed.data.scope,
+      expiresInDays: parsed.data.expiresInDays ?? null,
+    });
+
+    await writeAuditLog({
+      action: "api_token.created",
+      actorType: "user",
+      userId: user.id,
+      actorId: user.id,
+      metadata: { scope: parsed.data.scope, hasProject: Boolean(projectId) },
+    });
+
+    revalidatePath("/dashboard/settings");
+    return { ok: true, data: created };
+  } catch (e) {
+    if (e instanceof PlanError) return { ok: false, error: e.message };
+    if (e instanceof ProjectError) return { ok: false, error: e.message };
+    return { ok: false, error: "Token konnte nicht erstellt werden" };
+  }
 }
 
 export async function revokeCliTokenAction(

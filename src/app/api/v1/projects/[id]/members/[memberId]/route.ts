@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { apiError, apiOk } from "@/lib/api/errors";
-import { authenticateBearer } from "@/lib/cli/tokens";
+import {
+  assertScopeAllowsProject,
+  authenticateBearer,
+} from "@/lib/cli/tokens";
 import {
   removeProjectMember,
   updateProjectMemberRole,
@@ -20,7 +23,9 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
+    // Member management is owner territory — CI tokens stay out.
+    assertScopeAllowsProject(auth.scope, auth.projectId, null);
     const params = paramsSchema.safeParse(await ctx.params);
     const body = z
       .object({ role: memberRoleSchema })
@@ -45,7 +50,9 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
+    // Member management is owner territory — CI tokens stay out.
+    assertScopeAllowsProject(auth.scope, auth.projectId, null);
     const params = paramsSchema.safeParse(await ctx.params);
     if (!params.success) {
       return apiError("VALIDATION_ERROR", "Invalid input", 400);

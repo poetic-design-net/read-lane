@@ -192,6 +192,14 @@ export const projectUpdateSchema = projectCreateSchema.partial().extend({
   archived: z.boolean().optional(),
 });
 
+export const apiTokenCreateSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  /** Public project id, or empty for an account-wide token. */
+  projectId: z.string().optional().nullable(),
+  scope: z.enum(["full", "project_read", "project_write"]).default("full"),
+  expiresInDays: z.number().int().min(1).max(365).optional().nullable(),
+});
+
 export const memberRoleSchema = z.enum(["editor", "viewer"]);
 
 export const addMemberSchema = z.object({

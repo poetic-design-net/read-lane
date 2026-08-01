@@ -17,10 +17,17 @@ export type AuthContext = {
   actorType: "user" | "cli" | "api";
   tokenPublicId?: string;
   deviceName?: string | null;
+  /** Bearer tokens only — session auth is always unrestricted. */
+  scope?: string;
+  tokenProjectId?: string | null;
 };
 
 export class ApiAuthError extends Error {
-  constructor(message = "Nicht angemeldet") {
+  constructor(
+    message = "Nicht angemeldet",
+    /** 401 for missing/invalid credentials, 403 when the token may not do this. */
+    public status: 401 | 403 = 401
+  ) {
     super(message);
     this.name = "ApiAuthError";
   }
@@ -32,7 +39,7 @@ export async function requireAuth(
   const authHeader = req.headers.get("authorization");
   if (authHeader?.toLowerCase().startsWith("bearer ")) {
     try {
-      const cli = await authenticateBearer(authHeader);
+      const cli = await authenticateBearer(req);
       const db = getDb();
       const [user] = await db
         .select({
@@ -53,8 +60,14 @@ export async function requireAuth(
         actorType: "cli",
         tokenPublicId: cli.tokenPublicId,
         deviceName: cli.deviceName,
+        scope: cli.scope,
+        tokenProjectId: cli.projectId,
       };
     } catch (e) {
+      // A token that exists but may not do this is forbidden, not unauthenticated.
+      if (e instanceof CliAuthError && e.code === "FORBIDDEN_SCOPE") {
+        throw new ApiAuthError(e.message, 403);
+      }
       if (e instanceof CliAuthError) throw new ApiAuthError(e.message);
       throw e;
     }

@@ -5,6 +5,8 @@ import { listProjectsForUser } from "@/lib/projects/service";
 import { AppShell } from "@/components/layout/app-shell";
 import { AccountSettings } from "@/components/dashboard/account-settings";
 import { CliTokensList } from "@/components/dashboard/cli-tokens-list";
+import { ApiTokenForm } from "@/components/dashboard/api-token-form";
+import { getEntitlements } from "@/lib/plans/service";
 import { appConfig } from "@/lib/config";
 
 export default async function SettingsPage() {
@@ -15,9 +17,10 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
-  const [tokens, projects] = await Promise.all([
+  const [tokens, projects, { entitlements }] = await Promise.all([
     listCliTokens(user.id),
     listProjectsForUser(user.id),
+    getEntitlements(user.id),
   ]);
 
   return (
@@ -46,6 +49,23 @@ export default async function SettingsPage() {
               lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
               expiresAt: t.expiresAt?.toISOString() ?? null,
             }))}
+          />
+        </section>
+
+        <section className="mb-10">
+          <h2 className="mb-2 text-[15px] font-medium">API- und CI/CD-Tokens</h2>
+          <p className="mb-4 text-[13px] text-stone-400">
+            Für Pipelines und eigene Integrationen. Als{" "}
+            <code className="rounded bg-stone-100 px-1 text-[12px] dark:bg-stone-800">
+              Authorization: Bearer …
+            </code>{" "}
+            senden. Projekt-Tokens gelten nur für ihr Projekt.
+          </p>
+          <ApiTokenForm
+            projects={projects
+              .filter((p) => p.isOwner !== false)
+              .map((p) => ({ publicId: p.publicId, name: p.name }))}
+            enabled={entitlements.apiAccess}
           />
         </section>
 

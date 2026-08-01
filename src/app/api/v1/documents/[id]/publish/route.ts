@@ -1,6 +1,11 @@
 import { NextRequest } from "next/server";
 import { apiError, apiOk } from "@/lib/api/errors";
-import { authenticateBearer, CliAuthError } from "@/lib/cli/tokens";
+import {
+  assertScopeAllowsProject,
+  authenticateBearer,
+  CliAuthError,
+} from "@/lib/cli/tokens";
+import { canAccessDocument } from "@/lib/projects/members";
 import {
   DocumentError,
   getDocumentByPublicId,
@@ -13,12 +18,13 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const { id } = await ctx.params;
     const doc = await getDocumentByPublicId(id);
-    if (!doc || doc.createdBy !== auth.userId) {
+    if (!doc || !(await canAccessDocument(doc, auth.userId, "editor"))) {
       return apiError("NOT_FOUND", "Document not found", 404);
     }
+    assertScopeAllowsProject(auth.scope, auth.projectId, doc.projectId);
     const updated = await updateDocumentById(
       doc,
       { status: "published" },

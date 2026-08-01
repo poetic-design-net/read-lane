@@ -1,6 +1,11 @@
 import { NextRequest } from "next/server";
 import { apiError, apiOk } from "@/lib/api/errors";
-import { authenticateBearer, CliAuthError } from "@/lib/cli/tokens";
+import {
+  assertScopeAllowsProject,
+  authenticateBearer,
+  CliAuthError,
+} from "@/lib/cli/tokens";
+import { canAccessDocument, type MemberRole } from "@/lib/projects/members";
 import {
   DocumentError,
   getDocumentByPublicId,
@@ -11,25 +16,17 @@ import { updateDocumentSchema } from "@/lib/validation/document";
 import { shareUrl } from "@/lib/utils/urls";
 import { contentChecksum } from "@/lib/utils/checksum";
 
-async function assertDocAccess(publicId: string, userId: string) {
+async function assertDocAccess(
+  publicId: string,
+  auth: { userId: string; scope: string; projectId: string | null },
+  minRole: MemberRole = "editor"
+) {
   const doc = await getDocumentByPublicId(publicId);
   if (!doc) throw new DocumentError("Not found", "NOT_FOUND");
-  if (doc.createdBy !== userId) {
-    // allow if user owns project
-    if (doc.projectId) {
-      const { getDb } = await import("@/lib/db");
-      const { projects } = await import("@/lib/db/schema");
-      const { eq } = await import("drizzle-orm");
-      const db = getDb();
-      const rows = await db
-        .select()
-        .from(projects)
-        .where(eq(projects.id, doc.projectId))
-        .limit(1);
-      if (rows[0]?.ownerId === userId) return doc;
-    }
+  if (!(await canAccessDocument(doc, auth.userId, minRole))) {
     throw new DocumentError("Forbidden", "FORBIDDEN");
   }
+  assertScopeAllowsProject(auth.scope, auth.projectId, doc.projectId);
   return doc;
 }
 
@@ -38,9 +35,9 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const { id } = await ctx.params;
-    const doc = await assertDocAccess(id, auth.userId);
+    const doc = await assertDocAccess(id, auth, "viewer");
     return apiOk({
       document: {
         id: doc.publicId,
@@ -83,9 +80,9 @@ export async function PUT(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const { id } = await ctx.params;
-    const doc = await assertDocAccess(id, auth.userId);
+    const doc = await assertDocAccess(id, auth);
     const body = await req.json();
 
     const parsed = updateDocumentSchema.safeParse({
@@ -159,9 +156,9 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const { id } = await ctx.params;
-    const doc = await assertDocAccess(id, auth.userId);
+    const doc = await assertDocAccess(id, auth);
     await softDeleteDocument(doc);
     return apiOk({ ok: true });
   } catch (e) {

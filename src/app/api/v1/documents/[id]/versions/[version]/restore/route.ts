@@ -46,7 +46,13 @@ export async function POST(
     return apiOk({ document: updated }, 200, requestId);
   } catch (e) {
     if (e instanceof ApiAuthError) {
-      return apiError("UNAUTHENTICATED", e.message, 401, {}, requestId);
+      return apiError(
+        e.status === 403 ? "FORBIDDEN" : "UNAUTHENTICATED",
+        e.message,
+        e.status,
+        {},
+        requestId
+      );
     }
     if (e instanceof PlanError) {
       return apiError("FEATURE_NOT_AVAILABLE", e.message, 403, {}, requestId);

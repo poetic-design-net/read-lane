@@ -28,7 +28,13 @@ export async function GET(req: NextRequest) {
     );
   } catch (e) {
     if (e instanceof ApiAuthError) {
-      return apiError("UNAUTHENTICATED", e.message, 401, {}, requestId);
+      return apiError(
+        e.status === 403 ? "FORBIDDEN" : "UNAUTHENTICATED",
+        e.message,
+        e.status,
+        {},
+        requestId
+      );
     }
     return apiError("INTERNAL_ERROR", "Unexpected error", 500, {}, requestId);
   }

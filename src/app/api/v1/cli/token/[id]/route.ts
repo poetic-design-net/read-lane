@@ -11,7 +11,7 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const { id } = await ctx.params;
     await revokeCliToken(auth.userId, id);
     return apiOk({ ok: true });

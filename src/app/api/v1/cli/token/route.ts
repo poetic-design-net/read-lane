@@ -8,7 +8,7 @@ import {
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await authenticateBearer(req.headers.get("authorization"));
+    const auth = await authenticateBearer(req);
     const tokens = await listCliTokens(auth.userId);
     return apiOk({ tokens });
   } catch (e) {
