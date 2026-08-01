@@ -2,10 +2,12 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Copy,
   ExternalLink,
   FileText,
+  FolderInput,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -30,6 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { ProjectSummary, SafeDocumentListItem } from "@/types/document";
 import { shareUrl } from "@/lib/utils/urls";
+import { moveDocumentToProjectAction } from "@/app/actions/documents";
 import { appConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
@@ -53,11 +56,14 @@ function relativeUpdated(date: Date | string): string {
 
 export function ProjectWorkspace({
   project,
+  projects = [],
   documents,
   previews,
   mode = "project",
 }: {
   project?: ProjectSummary | null;
+  /** Move targets — every project the user may write to. */
+  projects?: ProjectSummary[];
   documents: SafeDocumentListItem[];
   previews: Record<string, string>;
   /** project page vs dashboard overview */
@@ -69,7 +75,9 @@ export function ProjectWorkspace({
   const [shareOpen, setShareOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [moving, setMoving] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -100,6 +108,18 @@ export function ProjectWorkspace({
   const createHref = project
     ? `/create?project=${encodeURIComponent(project.publicId)}`
     : "/create";
+
+  async function moveTo(publicId: string, target: string | null) {
+    setMoving(publicId);
+    const res = await moveDocumentToProjectAction(publicId, target);
+    setMoving(null);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success(target ? "Dokument verschoben" : "Aus Projekt entfernt");
+    router.refresh();
+  }
 
   async function copyLink(url: string) {
     try {
@@ -178,17 +198,32 @@ export function ProjectWorkspace({
               Neu schreiben
             </Button>
             {project && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-9 rounded-full"
-                render={
-                  <a href="#cli-connect" />
-                }
-              >
-                <Terminal data-icon="inline-start" />
-                CLI verbinden
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 rounded-full"
+                  render={
+                    <a href="#cli-connect" />
+                  }
+                >
+                  <Terminal data-icon="inline-start" />
+                  CLI verbinden
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 rounded-full"
+                  render={
+                    <Link
+                      href={`/dashboard/projects/${project.publicId}?settings=1`}
+                    />
+                  }
+                >
+                  <Settings2 data-icon="inline-start" />
+                  Projekt umbenennen
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -344,6 +379,36 @@ export function ProjectWorkspace({
                               >
                                 <ExternalLink className="size-3.5" />
                                 Öffnen
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {projects.length > 0 && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <p className="px-2 py-1 text-[11px] uppercase tracking-[0.08em] text-stone-400">
+                                Verschieben nach
+                              </p>
+                              {projects.map((p) => (
+                                <DropdownMenuItem
+                                  key={p.publicId}
+                                  disabled={
+                                    moving !== null ||
+                                    p.publicId === project?.publicId
+                                  }
+                                  onClick={() =>
+                                    void moveTo(d.publicId, p.publicId)
+                                  }
+                                >
+                                  <FolderInput className="size-3.5" />
+                                  {p.name}
+                                </DropdownMenuItem>
+                              ))}
+                              <DropdownMenuItem
+                                disabled={moving !== null || !project}
+                                onClick={() => void moveTo(d.publicId, null)}
+                              >
+                                <FolderInput className="size-3.5" />
+                                Kein Projekt
                               </DropdownMenuItem>
                             </>
                           )}

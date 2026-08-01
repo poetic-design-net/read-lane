@@ -660,6 +660,18 @@ export async function listDocumentsForUser(
   return rows.map(toListItem);
 }
 
+/** Assign or clear a document's project. Access checks live in the caller. */
+export async function moveDocumentToProject(
+  documentId: string,
+  projectId: string | null
+) {
+  const db = getDb();
+  await db
+    .update(documents)
+    .set({ projectId, updatedAt: new Date() })
+    .where(eq(documents.id, documentId));
+}
+
 export async function listVersions(documentId: string) {
   const db = getDb();
   return db

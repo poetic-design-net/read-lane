@@ -7,6 +7,7 @@ import {
   DocumentError,
   getDocumentByManagementToken,
   getDocumentByPublicId,
+  moveDocumentToProject,
   regeneratePublicId,
   softDeleteDocument,
   updateDocumentById,
@@ -34,7 +35,8 @@ import {
   updateDocumentSchema,
 } from "@/lib/validation/document";
 import { manageUrl, shareUrl } from "@/lib/utils/urls";
-import { assertProjectAccess } from "@/lib/projects/service";
+import { assertProjectAccess, ProjectError } from "@/lib/projects/service";
+import { assertCanUseProjects, PlanError } from "@/lib/plans/service";
 import { canAccessDocument } from "@/lib/projects/members";
 import type { ActionResult } from "./auth";
 
@@ -273,6 +275,50 @@ export async function createManagementUrlAction(
     ok: true,
     data: { manageUrl: `${appConfig.url}/manage/s/${token}` },
   };
+}
+
+/**
+ * Move a document into another project, or out of every project.
+ * Both sides are checked: editor on the document, editor on the target.
+ */
+export async function moveDocumentToProjectAction(
+  publicId: string,
+  projectPublicId: string | null
+): Promise<ActionResult> {
+  const user = await requireUser();
+  const doc = await getDocumentByPublicId(publicId);
+  if (!doc) return { ok: false, error: "Nicht gefunden" };
+  if (!(await canAccessDocument(doc, user.id, "editor"))) {
+    return { ok: false, error: "Kein Zugriff" };
+  }
+
+  let targetId: string | null = null;
+  if (projectPublicId) {
+    try {
+      await assertCanUseProjects(user.id);
+      const project = await assertProjectAccess(
+        projectPublicId,
+        user.id,
+        "editor"
+      );
+      targetId = project.id;
+    } catch (e) {
+      if (e instanceof ProjectError || e instanceof PlanError) {
+        return { ok: false, error: e.message };
+      }
+      return { ok: false, error: "Kein Zugriff auf dieses Projekt" };
+    }
+  }
+
+  if (targetId === doc.projectId) return { ok: true };
+
+  await moveDocumentToProject(doc.id, targetId);
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/projects");
+  if (projectPublicId) {
+    revalidatePath(`/dashboard/projects/${projectPublicId}`);
+  }
+  return { ok: true };
 }
 
 export async function getDocumentVersionsAction(publicId: string) {

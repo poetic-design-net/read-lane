@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, exists, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { documents, projectMembers, projects } from "@/lib/db/schema";
 import { createProjectPublicId } from "@/lib/security/tokens";
@@ -128,27 +128,37 @@ export async function listProjectsForUser(
       defaultTheme: projects.defaultTheme,
       defaultContentWidth: projects.defaultContentWidth,
       defaultFontStyle: projects.defaultFontStyle,
-      documentCount: sql<number>`(
-        SELECT COUNT(*)::int FROM documents
-        WHERE documents.project_id = ${projects.id}
-        AND documents.deleted_at IS NULL
-      )`,
+      documentCount: count(documents.id),
     })
     .from(projects)
+    // Counted by join, not by a correlated subquery: drizzle renders an
+    // embedded column as a bare "id", which a subquery resolves against its
+    // own table — the count silently came out as zero.
+    .leftJoin(
+      documents,
+      and(eq(documents.projectId, projects.id), isNull(documents.deletedAt))
+    )
     .where(
       and(
         // Own projects plus the ones shared with this user.
         or(
           eq(projects.ownerId, userId),
-          sql`EXISTS (
-            SELECT 1 FROM project_members
-            WHERE project_members.project_id = ${projects.id}
-            AND project_members.user_id = ${userId}
-          )`
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(projectMembers)
+              .where(
+                and(
+                  eq(projectMembers.projectId, projects.id),
+                  eq(projectMembers.userId, userId)
+                )
+              )
+          )
         ),
         options.includeArchived ? undefined : isNull(projects.archivedAt)
       )
     )
+    .groupBy(projects.id)
     .orderBy(desc(projects.updatedAt));
 
   return rows.map((r) => ({

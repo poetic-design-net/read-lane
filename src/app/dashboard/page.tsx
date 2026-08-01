@@ -84,6 +84,7 @@ export default async function DashboardPage() {
     >
       <ProjectWorkspace
         documents={documentList}
+        projects={projects}
         previews={previews}
         mode="dashboard"
       />

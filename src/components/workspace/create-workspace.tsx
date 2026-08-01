@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FileText,
-  FolderPlus,
   Plus,
   Settings2,
   Share2,
@@ -16,11 +15,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { LivePreview } from "@/components/editor/live-preview";
+import { ExamplePicker } from "@/components/editor/example-picker";
 import { PublishDialog } from "@/components/editor/publish-dialog";
 import { useFileIntake } from "@/components/editor/use-file-intake";
 import { FormatView } from "@/components/document/format-view";
 import { ACCEPT_ATTRIBUTE, isProseRenderer } from "@/lib/documents/formats";
-import { EXAMPLE_MARKDOWN } from "@/lib/markdown/example";
 import { appConfig } from "@/lib/config";
 import { planLimits } from "@/lib/plans/config";
 import { publishDocumentAction } from "@/app/actions/documents";
@@ -319,20 +318,24 @@ export function CreateWorkspace({
               {uploading ? "Wird geladen…" : "Dokument hochladen"}
             </Button>
             {!result && !hasContent && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-9 rounded-full"
-                onClick={() =>
+              <ExamplePicker
+                plan={plan}
+                projectId={state.projectId}
+                onLoadSingle={(example, upload) => {
                   update({
-                    markdownContent: EXAMPLE_MARKDOWN,
-                    title: state.title || "Beispieldokument",
-                  })
-                }
-              >
-                <FolderPlus data-icon="inline-start" />
-                Beispiel laden
-              </Button>
+                    title: example.title,
+                    description: "",
+                    markdownContent:
+                      upload?.markdownContent ?? example.content ?? "",
+                    rendererType: example.rendererType,
+                    fileId: upload?.fileId ?? null,
+                    sourceFilename: example.filename,
+                    previewUrl: upload?.previewUrl ?? null,
+                    fileSize: upload?.fileSize ?? null,
+                  });
+                  toast.success("Beispiel geladen");
+                }}
+              />
             )}
             {hasContent && !result && (
               <>
@@ -479,6 +482,8 @@ export function CreateWorkspace({
             )}
         </div>
 
+        {/* Onboarding hints — gone as soon as there is something to publish. */}
+        {!hasContent && !result && (
         <div className="mt-auto grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-stone-50 p-3.5 ring-1 ring-stone-100 dark:bg-stone-900 dark:ring-stone-800">
             <p className="text-[12px] font-medium text-stone-700 dark:text-stone-200">
@@ -533,6 +538,7 @@ export function CreateWorkspace({
             </p>
           </button>
         </div>
+        )}
       </section>
 
       <aside className="relative hidden min-h-0 flex-col border-l border-stone-200/70 bg-[#fcfcfb] dark:border-stone-800 dark:bg-stone-950/40 lg:flex">

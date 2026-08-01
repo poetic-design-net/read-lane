@@ -138,6 +138,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps) {
         <div className="relative h-full min-h-0">
           <ProjectWorkspace
             project={summary}
+            projects={projects}
             documents={items}
             previews={previews}
             mode="project"
