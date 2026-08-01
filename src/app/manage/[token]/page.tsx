@@ -14,7 +14,8 @@ import {
   MarketingHeader,
 } from "@/components/layout/marketing-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { shareUrl } from "@/lib/utils/urls";
+import { shareUrlOn } from "@/lib/utils/urls";
+import { getDomainForDocument } from "@/lib/domains/service";
 
 export const metadata: Metadata = {
   title: "Dokument verwalten",
@@ -89,7 +90,7 @@ export default async function ManagePage({ params }: PageProps) {
             mode="manage"
             managementToken={token}
             publicId={doc.publicId}
-            shareUrl={shareUrl(doc.publicId)}
+            shareUrl={shareUrlOn((await getDomainForDocument(doc))?.host, doc.publicId)}
             lastSavedAt={doc.updatedAt}
             initial={{
               title: doc.title,

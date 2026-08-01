@@ -6,7 +6,8 @@ import { getDocumentByPublicId } from "@/lib/documents/service";
 import { DocumentEditor } from "@/components/editor/document-editor";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
-import { shareUrl } from "@/lib/utils/urls";
+import { shareUrlOn } from "@/lib/utils/urls";
+import { getDomainForDocument } from "@/lib/domains/service";
 
 export const metadata: Metadata = {
   title: "Dokument verwalten",
@@ -51,7 +52,7 @@ export default async function SignedManagePage({ params }: PageProps) {
         <DocumentEditor
           mode="dashboard"
           publicId={doc.publicId}
-          shareUrl={shareUrl(doc.publicId)}
+          shareUrl={shareUrlOn((await getDomainForDocument(doc))?.host, doc.publicId)}
           lastSavedAt={doc.updatedAt}
           initial={{
             title: doc.title,

@@ -5,6 +5,11 @@ export function shareUrl(publicId: string): string {
   return `${appConfig.url}/s/${publicId}`;
 }
 
+/** Share URL under a verified custom domain, falling back to the app host. */
+export function shareUrlOn(host: string | null | undefined, publicId: string) {
+  return host ? `https://${host}/s/${publicId}` : shareUrl(publicId);
+}
+
 /** Legacy path still works via rewrite / soft alias */
 export function shareUrlLegacy(publicId: string): string {
   return `${appConfig.url}/d/${publicId}`;

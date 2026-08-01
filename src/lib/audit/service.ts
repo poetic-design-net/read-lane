@@ -28,6 +28,7 @@ export type AuditAction =
   | "document.share_link_rotated"
   | "cli.device_approved"
   | "cli.device_revoked"
+  | "domain.verified"
   | "api_token.created"
   | "api_token.revoked"
   | "file.uploaded"

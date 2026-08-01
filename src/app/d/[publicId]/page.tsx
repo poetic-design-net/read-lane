@@ -20,6 +20,9 @@ import { brandConfig } from "@/lib/brand/config";
 import { shareUrl } from "@/lib/utils/urls";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { getStorage } from "@/lib/storage";
+import { headers } from "next/headers";
+import { getVerifiedDomainByHost } from "@/lib/domains/service";
+import { getEntitlements } from "@/lib/plans/service";
 
 /** Password sessions and visibility checks must never be statically cached. */
 export const dynamic = "force-dynamic";
@@ -102,6 +105,10 @@ export default async function DocumentPage({ params }: PageProps) {
     notFound();
   }
 
+  // On a custom domain only that account's (or project's) documents exist.
+  const branding = await resolveBranding(view.raw);
+  if (branding.wrongHost) notFound();
+
   const { document, requiresPassword } = view;
   const unlocked = requiresPassword
     ? await hasUnlockSession(publicId)
@@ -150,9 +157,18 @@ export default async function DocumentPage({ params }: PageProps) {
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-stone-200/80 bg-white px-4 sm:px-6 dark:border-stone-800 dark:bg-stone-950">
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/" className="flex shrink-0 items-center gap-2">
-            <Logo variant="mark" size="md" />
+            {branding.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- customer-hosted logo, no loader
+              <img
+                src={branding.logoUrl}
+                alt={branding.name}
+                className="h-5 w-auto"
+              />
+            ) : (
+              branding.showReadlane && <Logo variant="mark" size="md" />
+            )}
             <span className="hidden text-[13px] font-medium text-stone-500 sm:inline">
-              {appConfig.name}
+              {branding.name}
             </span>
           </Link>
 
@@ -212,22 +228,67 @@ export default async function DocumentPage({ params }: PageProps) {
               allowDownload={document.allowDownload}
             />
 
-            <footer className="mt-16 border-t border-stone-100 pt-6 text-[12px] text-stone-400 dark:border-stone-800">
-              Geteilt mit{" "}
-              <Link
-                href="/"
-                className="font-medium text-stone-500 hover:text-stone-700"
-              >
-                {brandConfig.name}
-              </Link>
-              {" · "}
-              {brandConfig.tagline}
-            </footer>
+            {branding.showReadlane && (
+              <footer className="mt-16 border-t border-stone-100 pt-6 text-[12px] text-stone-400 dark:border-stone-800">
+                Geteilt mit{" "}
+                <Link
+                  href="/"
+                  className="font-medium text-stone-500 hover:text-stone-700"
+                >
+                  {brandConfig.name}
+                </Link>
+                {" · "}
+                {brandConfig.tagline}
+              </footer>
+            )}
           </div>
         </article>
       </div>
     </DocShell>
   );
+}
+
+/**
+ * Decides whose name is on the page. A verified custom domain serves only its
+ * own documents; the Readlane chrome disappears for plans that pay for it.
+ */
+async function resolveBranding(doc: {
+  createdBy: string | null;
+  projectId: string | null;
+}): Promise<{
+  wrongHost: boolean;
+  name: string;
+  logoUrl: string | null;
+  showReadlane: boolean;
+  color: string | null;
+}> {
+  const host = (await headers()).get("host");
+  const domain = host ? await getVerifiedDomainByHost(host) : null;
+
+  if (domain) {
+    const belongs =
+      domain.userId === doc.createdBy &&
+      (!domain.projectId || domain.projectId === doc.projectId);
+    return {
+      wrongHost: !belongs,
+      name: domain.brandName ?? domain.host,
+      logoUrl: domain.brandLogoUrl,
+      showReadlane: false,
+      color: domain.brandColor,
+    };
+  }
+
+  const removeBranding = doc.createdBy
+    ? (await getEntitlements(doc.createdBy)).entitlements.removeBranding
+    : false;
+
+  return {
+    wrongHost: false,
+    name: brandConfig.name,
+    logoUrl: null,
+    showReadlane: !removeBranding,
+    color: null,
+  };
 }
 
 function DocChrome({

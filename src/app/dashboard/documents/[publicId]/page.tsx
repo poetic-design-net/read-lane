@@ -10,7 +10,8 @@ import {
 import { listProjectsForUser } from "@/lib/projects/service";
 import { DocumentEditor } from "@/components/editor/document-editor";
 import { AppShell } from "@/components/layout/app-shell";
-import { shareUrl } from "@/lib/utils/urls";
+import { shareUrlOn } from "@/lib/utils/urls";
+import { getDomainForDocument } from "@/lib/domains/service";
 import { VersionHistory } from "@/components/dashboard/version-history";
 import { StatusPill, statusFromDocument } from "@/components/design/status-pill";
 import { CopyButton } from "@/components/editor/copy-button";
@@ -35,6 +36,9 @@ export default async function DashboardDocumentPage({ params }: PageProps) {
     listVersions(doc.id),
     listProjectsForUser(user.id),
   ]);
+
+  const domain = await getDomainForDocument(doc);
+  const link = shareUrlOn(domain?.host, doc.publicId);
 
   return (
     <AppShell projects={projects} user={user} title={doc.title}>
@@ -65,14 +69,14 @@ export default async function DashboardDocumentPage({ params }: PageProps) {
             </p>
           </div>
           {doc.status === "published" && (
-            <CopyButton value={shareUrl(doc.publicId)} label="Share-Link" />
+            <CopyButton value={link} label="Share-Link" />
           )}
         </div>
 
         <DocumentEditor
           mode="dashboard"
           publicId={doc.publicId}
-          shareUrl={shareUrl(doc.publicId)}
+          shareUrl={link}
           lastSavedAt={doc.updatedAt}
           initial={{
             title: doc.title,

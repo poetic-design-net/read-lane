@@ -7,6 +7,8 @@ import { AccountSettings } from "@/components/dashboard/account-settings";
 import { CliTokensList } from "@/components/dashboard/cli-tokens-list";
 import { ApiTokenForm } from "@/components/dashboard/api-token-form";
 import { getEntitlements } from "@/lib/plans/service";
+import { DomainsPanel } from "@/components/dashboard/domains-panel";
+import { listDomains, VERIFICATION_PREFIX } from "@/lib/domains/service";
 import { appConfig } from "@/lib/config";
 
 export default async function SettingsPage() {
@@ -17,11 +19,17 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
-  const [tokens, projects, { entitlements }] = await Promise.all([
+  const [tokens, projects, { entitlements }, domains] = await Promise.all([
     listCliTokens(user.id),
     listProjectsForUser(user.id),
     getEntitlements(user.id),
+    listDomains(user.id),
   ]);
+
+  // Tokens and domains may only be bound to projects the user owns.
+  const ownedProjects = projects
+    .filter((p) => p.isOwner !== false)
+    .map((p) => ({ publicId: p.publicId, name: p.name }));
 
   return (
     <AppShell projects={projects} user={user} title="Einstellungen">
@@ -62,10 +70,31 @@ export default async function SettingsPage() {
             senden. Projekt-Tokens gelten nur für ihr Projekt.
           </p>
           <ApiTokenForm
-            projects={projects
-              .filter((p) => p.isOwner !== false)
-              .map((p) => ({ publicId: p.publicId, name: p.name }))}
+            projects={ownedProjects}
             enabled={entitlements.apiAccess}
+          />
+        </section>
+
+        <section className="mb-10">
+          <h2 className="mb-2 text-[15px] font-medium">Eigene Domains</h2>
+          <p className="mb-4 text-[13px] text-stone-400">
+            Dokumente unter Ihrer eigenen Domain ausliefern — mit eigenem Namen
+            und Logo statt {appConfig.name}.
+          </p>
+          <DomainsPanel
+            domains={domains.map((d) => ({
+              publicId: d.publicId,
+              host: d.host,
+              projectName: d.projectName,
+              verified: Boolean(d.verifiedAt),
+              verificationToken: d.verificationToken,
+              brandName: d.brandName,
+              brandColor: d.brandColor,
+              brandLogoUrl: d.brandLogoUrl,
+            }))}
+            projects={ownedProjects}
+            enabled={entitlements.customDomains}
+            verificationPrefix={VERIFICATION_PREFIX}
           />
         </section>
 

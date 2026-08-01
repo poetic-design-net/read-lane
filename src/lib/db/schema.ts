@@ -612,6 +612,40 @@ export const freeDocumentSelections = pgTable(
   }
 );
 
+/* ─── Custom domains & branding (Business) ──────────────────────────────── */
+
+export const customDomains = pgTable(
+  "custom_domains",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    publicId: text("public_id").notNull().unique(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Null means the domain serves every document of this account. */
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
+    host: text("host").notNull().unique(),
+    /** Expected value of the TXT record at _readlane-verify.<host>. */
+    verificationToken: text("verification_token").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    brandName: text("brand_name"),
+    brandColor: text("brand_color"),
+    brandLogoUrl: text("brand_logo_url"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("custom_domains_user_id_idx").on(t.userId),
+    index("custom_domains_project_id_idx").on(t.projectId),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type Document = typeof documents.$inferSelect;
