@@ -45,6 +45,17 @@ export function toManageableDocument(doc: Document): ManageableDocument {
   };
 }
 
+/**
+ * Dashboard list previews render a few lines at most, so only that much is
+ * sent to the browser — a full document body per row adds up fast.
+ */
+export function previewExcerpt(markdown: string, maxChars = 1500): string {
+  if (markdown.length <= maxChars) return markdown;
+  const cut = markdown.slice(0, maxChars);
+  const lastBreak = cut.lastIndexOf("\n");
+  return `${lastBreak > maxChars / 2 ? cut.slice(0, lastBreak) : cut}\n\n…`;
+}
+
 export function toListItem(doc: Document): SafeDocumentListItem {
   return {
     publicId: doc.publicId,

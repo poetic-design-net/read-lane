@@ -10,7 +10,7 @@ import { WorkspaceSidebar } from "@/components/workspace/workspace-sidebar";
 import { ProjectWorkspace } from "@/components/workspace/project-workspace";
 import { FreeSlotDashboard } from "@/components/dashboard/free-slot-dashboard";
 import { getUserPlan, getActiveDocument } from "@/lib/plans/service";
-import { toListItem } from "@/lib/documents/mappers";
+import { previewExcerpt, toListItem } from "@/lib/documents/mappers";
 import { appConfig } from "@/lib/config";
 
 export default async function DashboardPage() {
@@ -70,7 +70,7 @@ export default async function DashboardPage() {
       .limit(40);
 
     for (const row of rows) {
-      previews[row.publicId] = row.markdownContent;
+      previews[row.publicId] = previewExcerpt(row.markdownContent);
     }
   }
 

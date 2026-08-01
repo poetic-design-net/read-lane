@@ -6,7 +6,7 @@ import { assertProjectAccess, ProjectError } from "@/lib/projects/service";
 import { listProjectsForUser } from "@/lib/projects/service";
 import { getDb } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
-import { toListItem } from "@/lib/documents/mappers";
+import { previewExcerpt, toListItem } from "@/lib/documents/mappers";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProjectWorkspace } from "@/components/workspace/project-workspace";
 import { ProjectSettingsForm } from "@/components/dashboard/project-settings-form";
@@ -72,7 +72,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps) {
   const items = rows.map(toListItem);
   const previews: Record<string, string> = {};
   for (const row of rows) {
-    previews[row.publicId] = row.markdownContent;
+    previews[row.publicId] = previewExcerpt(row.markdownContent);
   }
 
   const summary = {

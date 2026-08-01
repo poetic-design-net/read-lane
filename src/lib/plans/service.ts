@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, count, eq, isNull, ne, sum } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { documents, files, subscriptions, users } from "@/lib/db/schema";
@@ -27,7 +28,14 @@ export class PlanError extends Error {
 
 const PAID_STATUSES = new Set(["active", "trialing", "past_due"]);
 
-export async function getUserPlan(userId: string): Promise<PlanId> {
+/**
+ * Two queries per call, and every assert* below calls it — an upload alone
+ * asked three times. `cache` collapses that to once per request; outside a
+ * request (scripts, tests) it simply passes through.
+ */
+export const getUserPlan = cache(async function getUserPlan(
+  userId: string
+): Promise<PlanId> {
   const db = getDb();
 
   const [user] = await db
@@ -53,7 +61,7 @@ export async function getUserPlan(userId: string): Promise<PlanId> {
   }
 
   return (user?.plan as PlanId) ?? "free";
-}
+});
 
 
 /** EntitlementService — single source of truth for feature gates */
