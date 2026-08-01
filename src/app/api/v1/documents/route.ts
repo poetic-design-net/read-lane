@@ -7,6 +7,7 @@ import {
   DocumentError,
   listDocumentsForUser,
 } from "@/lib/documents/service";
+import { assertProjectAccess, ProjectError } from "@/lib/projects/service";
 import { publishDocumentSchema } from "@/lib/validation/document";
 import { PlanError } from "@/lib/plans/service";
 import { writeAuditLog } from "@/lib/audit/service";
@@ -70,6 +71,39 @@ export async function POST(req: NextRequest) {
       auth.tokenProjectId,
       parsed.data.projectId ?? null
     );
+
+    // The API hands out public project ids (`prj_…`), so that is what comes
+    // back in. `documents.project_id` is a uuid — writing the public id
+    // straight through failed with a 500. Resolving it here also enforces
+    // access: without this check a caller could attach a document to a
+    // foreign project by guessing its internal uuid.
+    if (parsed.data.projectId) {
+      try {
+        const project = await assertProjectAccess(
+          parsed.data.projectId,
+          auth.userId,
+          "editor"
+        );
+        parsed.data.projectId = project.id;
+      } catch (e) {
+        if (e instanceof ProjectError && e.code === "NOT_FOUND") {
+          return apiError(
+            "RESOURCE_NOT_FOUND",
+            "Projekt nicht gefunden",
+            404,
+            {},
+            requestId
+          );
+        }
+        return apiError(
+          "FORBIDDEN",
+          "Kein Zugriff auf dieses Projekt",
+          403,
+          {},
+          requestId
+        );
+      }
+    }
 
     const result = await createDocument(parsed.data, {
       userId: auth.userId,
