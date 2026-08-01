@@ -8,6 +8,9 @@ import {
 import { PdfViewer } from "./pdf-viewer";
 import { ImageView } from "./image-view";
 
+/** Rows a table renders before it turns into a wall of DOM nodes. */
+const MAX_CSV_ROWS = 500;
+
 /** Server-safe format display for public document pages. */
 export function FormatView({
   content,
@@ -161,14 +164,16 @@ function CsvTable({
   content: string;
   className?: string;
 }) {
-  const rows = content
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => parseCsvLine(line));
-  if (rows.length === 0) {
+  const lines = content.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length === 0) {
     return <p className="text-sm text-stone-400">Leere Tabelle</p>;
   }
+  // ponytail: a big table is truncated instead of streamed — paging belongs in
+  // the reader UI, not in a render path that would have to hold every row.
+  const truncated = lines.length - 1 > MAX_CSV_ROWS;
+  const rows = lines
+    .slice(0, MAX_CSV_ROWS + 1)
+    .map((line) => parseCsvLine(line));
   const header = rows[0];
   const body = rows.slice(1);
 
@@ -210,6 +215,12 @@ function CsvTable({
           ))}
         </tbody>
       </table>
+      {truncated && (
+        <p className="border-t border-stone-100 px-3 py-2 text-[12px] text-stone-400 dark:border-stone-800">
+          Nur die ersten {MAX_CSV_ROWS.toLocaleString("de-DE")} Zeilen werden
+          angezeigt. Die vollständige Datei steht zum Download bereit.
+        </p>
+      )}
     </div>
   );
 }
