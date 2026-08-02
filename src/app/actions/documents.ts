@@ -277,6 +277,26 @@ export async function createManagementUrlAction(
   };
 }
 
+/** Delete from the dashboard — soft delete, same as the management link. */
+export async function deleteDashboardDocumentAction(
+  publicId: string
+): Promise<ActionResult> {
+  const user = await requireUser();
+  const doc = await getDocumentByPublicId(publicId);
+  if (!doc) return { ok: false, error: "Nicht gefunden" };
+  if (!(await canAccessDocument(doc, user.id, "editor"))) {
+    return { ok: false, error: "Kein Zugriff" };
+  }
+  try {
+    await softDeleteDocument(doc);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/projects");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Löschen fehlgeschlagen" };
+  }
+}
+
 /**
  * Move a document into another project, or out of every project.
  * Both sides are checked: editor on the document, editor on the target.

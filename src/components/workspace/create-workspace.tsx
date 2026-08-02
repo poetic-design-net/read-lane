@@ -20,12 +20,12 @@ import { PublishDialog } from "@/components/editor/publish-dialog";
 import { useFileIntake } from "@/components/editor/use-file-intake";
 import { FormatView } from "@/components/document/format-view";
 import { ACCEPT_ATTRIBUTE, isProseRenderer } from "@/lib/documents/formats";
-import { appConfig } from "@/lib/config";
 import { planLimits } from "@/lib/plans/config";
 import { publishDocumentAction } from "@/app/actions/documents";
 import { StatusPill, statusFromDocument } from "@/components/design/status-pill";
 import { SharePanel } from "./share-panel";
 import type { EditorDocumentState } from "@/components/editor/document-editor";
+import type { RendererType } from "@/types/document";
 import { cn } from "@/lib/utils";
 
 const defaultState: EditorDocumentState = {
@@ -110,18 +110,25 @@ function readPendingUpload(projectId?: string | null): EditorDocumentState {
       name?: string;
       content?: string;
       projectId?: string | null;
+      rendererType?: RendererType;
+      fileId?: string | null;
+      previewUrl?: string | null;
+      fileSize?: number | null;
     };
-    if (!data.content?.trim()) return base;
-    const baseTitle = (data.name || "Dokument").replace(
-      /\.(md|markdown|txt)$/i,
-      ""
-    );
+    // Uploaded formats arrive without text — the file id is what matters.
+    if (!data.content?.trim() && !data.fileId) return base;
+    const baseTitle = (data.name || "Dokument").replace(/\.[^.]+$/, "");
     queueMicrotask(() => toast.success("Datei geladen"));
     return {
       ...base,
-      markdownContent: data.content,
+      markdownContent: data.content ?? "",
       title: baseTitle,
       projectId: data.projectId ?? projectId ?? null,
+      rendererType: data.rendererType ?? "markdown",
+      fileId: data.fileId ?? null,
+      sourceFilename: data.name ?? null,
+      previewUrl: data.previewUrl ?? null,
+      fileSize: data.fileSize ?? null,
     };
   } catch {
     return base;
@@ -438,20 +445,51 @@ export function CreateWorkspace({
                 }
               />
             ) : (
-            <Textarea
-              autoFocus
-              value={state.markdownContent}
-              onChange={(e) => update({ markdownContent: e.target.value })}
-              placeholder="Markdown hier einfügen oder Datei ablegen…"
-              className="min-h-[min(50vh,420px)] flex-1 resize-y rounded-xl border-stone-200 bg-stone-50/50 font-mono text-[13px] dark:border-stone-800 dark:bg-stone-900/40"
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={onDrop}
-              readOnly={Boolean(result)}
-            />
+              // The editor itself is the drop target — the outline only shows
+              // up while a file is over it.
+              <div
+                className="relative flex min-h-[min(50vh,420px)] flex-1"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setDragOver(false);
+                  }
+                }}
+                onDrop={onDrop}
+              >
+                <Textarea
+                  autoFocus
+                  value={state.markdownContent}
+                  onChange={(e) => update({ markdownContent: e.target.value })}
+                  placeholder="Markdown hier einfügen oder Datei ablegen…"
+                  className={cn(
+                    "flex-1 resize-y rounded-xl border-stone-200 bg-stone-50/50 font-mono text-[13px] transition dark:border-stone-800 dark:bg-stone-900/40",
+                    dragOver && "border-stone-400 dark:border-stone-500"
+                  )}
+                  readOnly={Boolean(result)}
+                />
+                {(dragOver || uploading) && (
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-stone-400 bg-stone-50/95 dark:border-stone-500 dark:bg-stone-900/95">
+                    <Upload
+                      className="mb-2 size-6 text-stone-400"
+                      strokeWidth={1.5}
+                    />
+                    <p className="text-[14px] font-medium text-stone-700 dark:text-stone-200">
+                      {uploading ? "Wird geladen…" : "Datei hier ablegen"}
+                    </p>
+                    <p className="mt-1 text-[12px] text-stone-400">
+                      Markdown, Text, Code, CSV, PDF, Bilder, Word bis{" "}
+                      {Math.round(
+                        planLimits[plan].maxFileSizeBytes / 1024 / 1024
+                      )}{" "}
+                      MB
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
             {result && (
               <div className="mt-3 rounded-xl bg-stone-50 px-3.5 py-3 text-[12px] leading-relaxed text-stone-600 ring-1 ring-stone-100 dark:bg-stone-900 dark:text-stone-300 dark:ring-stone-800">
@@ -481,63 +519,6 @@ export function CreateWorkspace({
             )}
         </div>
 
-        {/* Onboarding hints — gone as soon as there is something to publish. */}
-        {!hasContent && !result && (
-        <div className="mt-auto grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl bg-stone-50 p-3.5 ring-1 ring-stone-100 dark:bg-stone-900 dark:ring-stone-800">
-            <p className="text-[12px] font-medium text-stone-700 dark:text-stone-200">
-              Aus VS Code oder Terminal
-            </p>
-            <p className="mt-0.5 text-[11px] text-stone-400">
-              CLI mit Ihrem Konto verbinden und pushen.
-            </p>
-            <pre className="mt-2 overflow-x-auto rounded-xl bg-stone-900 p-3 font-mono text-[11px] leading-relaxed text-stone-200">
-              <span className="text-stone-500">$ </span>
-              {appConfig.cliName} push README.md --open{"\n"}
-              <span className="text-emerald-400">✓</span> README.md
-              veröffentlicht{"\n"}
-              <span className="text-sky-300">
-                {appConfig.url.replace(/^https?:\/\//, "")}/d/…
-              </span>
-            </pre>
-            <Link
-              href="/dashboard/settings"
-              className="mt-2 inline-block text-[11px] font-medium text-stone-500 underline-offset-2 hover:underline"
-            >
-              CLI-Zugänge verwalten
-            </Link>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-            className={cn(
-              "flex flex-col items-center justify-center rounded-2xl border border-dashed p-5 text-center transition",
-              dragOver
-                ? "border-stone-400 bg-stone-50 dark:border-stone-500"
-                : "border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60 dark:border-stone-700 dark:bg-stone-950"
-            )}
-          >
-            <Upload className="mb-2 size-5 text-stone-300" strokeWidth={1.5} />
-            <p className="text-[13px] font-medium text-stone-700 dark:text-stone-200">
-              Datei hier ablegen
-            </p>
-            <p className="mt-0.5 text-[11px] text-stone-400">
-              oder klicken zum Auswählen
-            </p>
-            <p className="mt-2 text-[10px] text-stone-300">
-              Markdown, Text, Code, CSV, PDF, Bilder, Word bis{" "}
-              {Math.round(planLimits[plan].maxFileSizeBytes / 1024 / 1024)} MB
-            </p>
-          </button>
-        </div>
-        )}
       </section>
 
       <aside className="relative hidden min-h-0 flex-col border-l border-stone-200/70 bg-[#fcfcfb] dark:border-stone-800 dark:bg-stone-950/40 lg:flex">

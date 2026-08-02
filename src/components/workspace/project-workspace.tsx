@@ -14,6 +14,7 @@ import {
   Settings2,
   Share2,
   Terminal,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
@@ -22,6 +23,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusPill, statusFromDocument } from "@/components/design/status-pill";
 import { LivePreview } from "@/components/editor/live-preview";
+import { useFileIntake } from "@/components/editor/use-file-intake";
+import {
+  ACCEPT_ATTRIBUTE,
+  detectRenderer,
+  isTextBasedRenderer,
+} from "@/lib/documents/formats";
+import type { PlanId } from "@/lib/plans/config";
 import { SharePanel } from "./share-panel";
 import {
   DropdownMenu,
@@ -32,8 +40,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { ProjectSummary, SafeDocumentListItem } from "@/types/document";
 import { shareUrl } from "@/lib/utils/urls";
-import { moveDocumentToProjectAction } from "@/app/actions/documents";
-import { appConfig } from "@/lib/config";
+import {
+  deleteDashboardDocumentAction,
+  moveDocumentToProjectAction,
+} from "@/app/actions/documents";
 import { cn } from "@/lib/utils";
 
 function extractHeadings(markdown: string): string[] {
@@ -60,6 +70,7 @@ export function ProjectWorkspace({
   documents,
   previews,
   mode = "project",
+  plan = "pro",
 }: {
   project?: ProjectSummary | null;
   /** Move targets — every project the user may write to. */
@@ -68,6 +79,8 @@ export function ProjectWorkspace({
   previews: Record<string, string>;
   /** project page vs dashboard overview */
   mode?: "project" | "dashboard";
+  /** Decides the upload size limit for dropped files. */
+  plan?: PlanId;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(
     documents[0]?.publicId ?? null
@@ -76,8 +89,10 @@ export function ProjectWorkspace({
   const [query, setQuery] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [moving, setMoving] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { pickFile, uploading } = useFileIntake(plan);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -109,6 +124,23 @@ export function ProjectWorkspace({
     ? `/create?project=${encodeURIComponent(project.publicId)}`
     : "/create";
 
+  async function remove(doc: SafeDocumentListItem) {
+    const label = doc.sourceFilename || doc.title;
+    if (!confirm(`„${label}“ löschen? Der Share-Link funktioniert danach nicht mehr.`)) {
+      return;
+    }
+    setDeleting(doc.publicId);
+    const res = await deleteDashboardDocumentAction(doc.publicId);
+    setDeleting(null);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    if (selectedId === doc.publicId) setSelectedId(null);
+    toast.success("Dokument gelöscht");
+    router.refresh();
+  }
+
   async function moveTo(publicId: string, target: string | null) {
     setMoving(publicId);
     const res = await moveDocumentToProjectAction(publicId, target);
@@ -130,33 +162,75 @@ export function ProjectWorkspace({
     }
   }
 
-  function onFilePicked(file: File | null) {
+  /**
+   * A file dropped here is handed to the editor, which is where publishing
+   * happens. Text is carried as text; everything else is uploaded first and
+   * travels as a file id, because a File cannot survive the navigation.
+   */
+  async function onFilePicked(file: File | null) {
     if (!file) return;
-    // Navigate to create flow with project context — file is re-selected there
-    // via sessionStorage so upload works end-to-end
-    const reader = new FileReader();
-    reader.onload = () => {
+
+    const handOver = (payload: Record<string, unknown>) => {
       try {
         sessionStorage.setItem(
           "readlane:pending-upload",
-          JSON.stringify({
-            name: file.name,
-            content: String(reader.result ?? ""),
-            projectId: project?.publicId ?? null,
-          })
+          JSON.stringify({ ...payload, projectId: project?.publicId ?? null })
         );
       } catch {
         // ignore quota
       }
-      window.location.href = createHref;
+      router.push(createHref);
     };
-    reader.readAsText(file);
+
+    if (isTextBasedRenderer(detectRenderer(file.name, file.type))) {
+      handOver({ name: file.name, content: await file.text() });
+      return;
+    }
+
+    const intake = await pickFile(file);
+    if (!intake) return;
+    handOver({
+      name: intake.sourceFilename,
+      content: intake.markdownContent,
+      rendererType: intake.rendererType,
+      fileId: intake.fileId,
+      previewUrl: intake.previewUrl,
+      fileSize: intake.fileSize,
+    });
   }
 
   return (
     <div className="grid h-full min-h-0 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] xl:grid-cols-[minmax(0,1.2fr)_minmax(420px,0.8fr)]">
-      {/* Center: list + actions */}
-      <section className="flex min-h-0 min-w-0 flex-col overflow-y-auto p-6 sm:p-8 lg:p-10">
+      {/* Center: list + actions. The whole column takes dropped files, so no
+          permanent drop zone has to sit around waiting for one. */}
+      <section
+        className="relative flex min-h-0 min-w-0 flex-col overflow-y-auto p-6 sm:p-8 lg:p-10"
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setDragOver(false);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          void onFilePicked(e.dataTransfer.files?.[0] ?? null);
+        }}
+      >
+        {dragOver && (
+          <div className="pointer-events-none absolute inset-4 z-20 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-400 bg-stone-50/95 dark:border-stone-500 dark:bg-stone-900/95">
+            <Upload className="mb-2 size-6 text-stone-400" strokeWidth={1.5} />
+            <p className="text-[14px] font-medium text-stone-700 dark:text-stone-200">
+              Datei hier ablegen
+            </p>
+            <p className="mt-1 text-[12px] text-stone-400">
+              Markdown, Text, Code, CSV, PDF, Bilder, Word
+            </p>
+          </div>
+        )}
         <div className="mb-6">
           <h1 className="text-[32px] font-semibold tracking-[-0.035em] text-stone-900 dark:text-stone-50 sm:text-[36px]">
             {mode === "dashboard" && !project
@@ -173,20 +247,21 @@ export function ProjectWorkspace({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              accept={ACCEPT_ATTRIBUTE}
               className="sr-only"
               onChange={(e) => {
-                onFilePicked(e.target.files?.[0] ?? null);
+                void onFilePicked(e.target.files?.[0] ?? null);
                 e.target.value = "";
               }}
             />
             <Button
               size="sm"
               className="h-9 rounded-full"
+              disabled={uploading}
               onClick={() => fileInputRef.current?.click()}
             >
               <Plus data-icon="inline-start" />
-              Dokument hochladen
+              {uploading ? "Wird geladen…" : "Dokument hochladen"}
             </Button>
             <Button
               size="sm"
@@ -203,9 +278,7 @@ export function ProjectWorkspace({
                   size="sm"
                   variant="outline"
                   className="h-9 rounded-full"
-                  render={
-                    <a href="#cli-connect" />
-                  }
+                  render={<Link href="/dashboard/settings" />}
                 >
                   <Terminal data-icon="inline-start" />
                   CLI verbinden
@@ -263,7 +336,7 @@ export function ProjectWorkspace({
             onDrop={(e) => {
               e.preventDefault();
               setDragOver(false);
-              onFilePicked(e.dataTransfer.files?.[0] ?? null);
+              void onFilePicked(e.dataTransfer.files?.[0] ?? null);
             }}
           >
             <Upload className="mb-3 size-6 text-stone-300" strokeWidth={1.5} />
@@ -423,6 +496,14 @@ export function ProjectWorkspace({
                             <Settings2 className="size-3.5" />
                             Einstellungen
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={deleting !== null}
+                            onClick={() => void remove(d)}
+                            className="text-red-600 dark:text-red-400"
+                          >
+                            <Trash2 className="size-3.5" />
+                            Löschen
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -433,69 +514,6 @@ export function ProjectWorkspace({
           </ul>
         )}
 
-        <div className="mt-auto grid gap-3 sm:grid-cols-2">
-          <div
-            id="cli-connect"
-            className="rounded-2xl bg-stone-50 p-3.5 ring-1 ring-stone-100 dark:bg-stone-900 dark:ring-stone-800"
-          >
-            <p className="text-[12px] font-medium text-stone-700 dark:text-stone-200">
-              Aus VS Code oder Terminal
-            </p>
-            <p className="mt-0.5 text-[11px] text-stone-400">
-              Dokumente direkt veröffentlichen.
-            </p>
-            <pre className="mt-2 overflow-x-auto rounded-xl bg-stone-900 p-3 font-mono text-[11px] leading-relaxed text-stone-200">
-              <span className="text-stone-500">$ </span>
-              {appConfig.cliName} push README.md --open{"\n"}
-              <span className="text-emerald-400">✓</span> README.md
-              veröffentlicht{"\n"}
-              <span className="text-sky-300">
-                {appConfig.url.replace(/^https?:\/\//, "")}/d/…
-              </span>
-            </pre>
-            {project && (
-              <p className="mt-2 text-[11px] text-stone-400">
-                Projekt:{" "}
-                <code className="text-stone-600 dark:text-stone-300">
-                  {project.slug || project.publicId}
-                </code>
-              </p>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              onFilePicked(e.dataTransfer.files?.[0] ?? null);
-            }}
-            className={cn(
-              "flex flex-col items-center justify-center rounded-2xl border border-dashed p-5 text-center transition",
-              dragOver
-                ? "border-stone-400 bg-stone-50 dark:border-stone-500"
-                : "border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/50 dark:border-stone-700 dark:bg-stone-950"
-            )}
-          >
-            <Upload className="mb-2 size-5 text-stone-300" strokeWidth={1.5} />
-            <p className="text-[13px] font-medium text-stone-700 dark:text-stone-200">
-              Dateien hier ablegen
-            </p>
-            <p className="mt-0.5 text-[11px] text-stone-400">
-              oder klicken zum Auswählen
-            </p>
-            <p className="mt-2 text-[10px] text-stone-300">
-              .md, .markdown, .txt bis{" "}
-              {Math.round(appConfig.maxFileSizeBytes / 1024 / 1024)} MB
-            </p>
-          </button>
-        </div>
       </section>
 
       {/* Right: live preview + share */}

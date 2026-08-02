@@ -87,6 +87,7 @@ export default async function DashboardPage() {
         projects={projects}
         previews={previews}
         mode="dashboard"
+        plan={plan}
       />
     </ProductShell>
   );

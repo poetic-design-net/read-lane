@@ -12,7 +12,7 @@ import { ProjectWorkspace } from "@/components/workspace/project-workspace";
 import { ProjectSettingsForm } from "@/components/dashboard/project-settings-form";
 import { ProjectMembersPanel } from "@/components/dashboard/project-members-panel";
 import { listProjectMembers } from "@/lib/projects/members";
-import { getEntitlements } from "@/lib/plans/service";
+import { getEntitlements, getUserPlan } from "@/lib/plans/service";
 
 interface PageProps {
   params: Promise<{ publicId: string }>;
@@ -29,7 +29,10 @@ export default async function ProjectPage({ params, searchParams }: PageProps) {
 
   const { publicId } = await params;
   const { q, status, settings } = await searchParams;
-  const projects = await listProjectsForUser(user.id);
+  const [projects, plan] = await Promise.all([
+    listProjectsForUser(user.id),
+    getUserPlan(user.id),
+  ]);
 
   let project;
   try {
@@ -142,6 +145,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps) {
             documents={items}
             previews={previews}
             mode="project"
+            plan={plan}
           />
           <Link
             href={`/dashboard/projects/${project.publicId}?settings=1`}
