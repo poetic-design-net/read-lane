@@ -9,6 +9,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const visibilityEnum = pgEnum("visibility", [
   "public",
@@ -206,6 +207,8 @@ export const projects = pgTable(
     defaultFontStyle: fontStyleEnum("default_font_style")
       .notNull()
       .default("sans"),
+    /** Client e-mail addresses an update for this project goes to. */
+    recipients: text("recipients").array().notNull().default(sql`'{}'::text[]`),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

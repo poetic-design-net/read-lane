@@ -89,6 +89,25 @@ Ausführlich: [Getting Started §7](docs/GETTING-STARTED.md#7-cli-installieren--
 
 ---
 
+## MCP (Kunden-Updates aus Claude)
+
+Endpunkt `POST /api/mcp` mit zwei Werkzeugen: `list_projects` und `publish_document`. Ein Projekt steht für einen Kunden; die Empfänger trägst du in den Projekteinstellungen ein. `publish_document` gibt den Link (unter der verifizierten Domain des Projekts) und die Empfänger zurück, der Agent legt daraus einen Mail-Entwurf an.
+
+1. Token anlegen: Dashboard → Einstellungen → „API- und CI/CD-Tokens“, Zugriff „Voll“.
+2. In Claude Code registrieren:
+
+```bash
+claude mcp add --transport http --scope user readlane https://read-lane.vercel.app/api/mcp --header "Authorization: Bearer <TOKEN>"
+```
+
+### Eigene Subdomain mit Branding
+
+1. Vercel → Projekt → Settings → Domains → Subdomain hinzufügen (z. B. `briefe.example.com`), beim DNS-Anbieter den angezeigten CNAME setzen.
+2. Readlane → Einstellungen → „Eigene Domains“ → dieselbe Subdomain hinzufügen, den angezeigten TXT-Eintrag unter `_readlane-verify.<subdomain>` anlegen, „Prüfen“.
+3. Name, Farbe und Logo-URL der Domain eintragen. Links aus `publish_document` zeigen ab dann auf die Subdomain.
+
+---
+
 ## Features (Kern)
 
 - Konto-Pflicht, Free = 1 dauerhafter Share-Link (ersetzen möglich)  

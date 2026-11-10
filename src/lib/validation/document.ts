@@ -190,6 +190,10 @@ export const projectCreateSchema = z.object({
 
 export const projectUpdateSchema = projectCreateSchema.partial().extend({
   archived: z.boolean().optional(),
+  recipients: z
+    .array(z.string().trim().toLowerCase().email("Ungültige E-Mail-Adresse"))
+    .max(20)
+    .optional(),
 });
 
 export const apiTokenCreateSchema = z.object({

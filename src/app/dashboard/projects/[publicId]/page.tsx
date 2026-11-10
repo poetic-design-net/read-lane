@@ -128,6 +128,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps) {
               defaultTheme: project.defaultTheme,
               defaultContentWidth: project.defaultContentWidth,
               defaultFontStyle: project.defaultFontStyle,
+              recipients: project.recipients,
             }}
           />
           <ProjectMembersPanel

@@ -98,6 +98,7 @@ export interface ProjectSummary {
   defaultFontStyle: FontStyle;
   /** False for projects shared with this user by someone else. */
   isOwner?: boolean;
+  recipients?: string[];
 }
 
 export interface SafeDocumentListItem {

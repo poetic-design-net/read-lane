@@ -128,6 +128,7 @@ export async function listProjectsForUser(
       defaultTheme: projects.defaultTheme,
       defaultContentWidth: projects.defaultContentWidth,
       defaultFontStyle: projects.defaultFontStyle,
+      recipients: projects.recipients,
       documentCount: count(documents.id),
     })
     .from(projects)
@@ -209,6 +210,9 @@ export async function updateProject(
       defaultContentWidth:
         input.defaultContentWidth ?? project.defaultContentWidth,
       defaultFontStyle: input.defaultFontStyle ?? project.defaultFontStyle,
+      recipients: input.recipients
+        ? [...new Set(input.recipients)]
+        : project.recipients,
       archivedAt:
         input.archived === true
           ? new Date()

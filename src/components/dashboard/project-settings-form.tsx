@@ -26,15 +26,25 @@ export function ProjectSettingsForm({
     defaultTheme: Theme;
     defaultContentWidth: ContentWidth;
     defaultFontStyle: FontStyle;
+    recipients: string[];
   };
 }) {
-  const [form, setForm] = useState(initial);
+  const { recipients: initialRecipients, ...rest } = initial;
+  const [form, setForm] = useState({
+    ...rest,
+    recipients: initialRecipients.join(", "),
+  });
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   async function save() {
     setLoading(true);
-    const res = await updateProjectAction(publicId, form);
+    const res = await updateProjectAction(publicId, {
+      ...form,
+      recipients: form.recipients
+        .split(/[\s,;]+/)
+        .filter(Boolean),
+    });
     setLoading(false);
     if (!res.ok) {
       toast.error(res.error);
@@ -84,6 +94,24 @@ export function ProjectSettingsForm({
             }
             rows={2}
           />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="project-recipients">Empfänger</FieldLabel>
+          <Input
+            id="project-recipients"
+            type="text"
+            inputMode="email"
+            autoComplete="off"
+            placeholder="kunde@example.com, team@example.com"
+            value={form.recipients}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, recipients: e.target.value }))
+            }
+          />
+          <p className="text-[12px] text-muted-foreground">
+            Wer ein Update zu diesem Projekt per Mail bekommt. Mehrere Adressen
+            mit Komma trennen.
+          </p>
         </Field>
         <div className="flex flex-wrap gap-2">
           <Button disabled={loading} onClick={() => void save()}>
