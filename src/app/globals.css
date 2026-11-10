@@ -141,6 +141,181 @@
   }
 }
 
+/*
+ * Branded share pages (custom domains). Editorial look after the agency's
+ * design system: Space Grotesk headings, Newsreader body, square corners,
+ * tonal surfaces instead of lines.
+ */
+.brand-page {
+  --brand-bg: #f9f9f9;
+  --brand-surface-low: #f3f3f3;
+  --brand-ink: #1a1c1c;
+  --brand-muted: #5d5f63;
+  --brand-ghost: rgb(196 198 205 / 0.35);
+  --brand-accent-current: var(--brand-accent, #00453c);
+  background: var(--brand-bg);
+  color: var(--brand-ink);
+  font-family: var(--font-brand-body), Georgia, serif;
+}
+
+html.dark .brand-page {
+  --brand-bg: #121414;
+  --brand-surface-low: #1a1c1c;
+  --brand-ink: #e8e8e6;
+  --brand-muted: #a3a5a9;
+  --brand-ghost: rgb(117 119 125 / 0.35);
+  --brand-accent-current: var(--brand-accent-dark, #84d5c5);
+}
+
+.brand-page .brand-header {
+  background: var(--brand-bg);
+}
+
+.brand-page .brand-header button,
+.brand-page .brand-header a[role="button"] {
+  border-radius: 0;
+}
+
+/* Logos often ship on an opaque white square; blend it into the surface. */
+.brand-page .brand-logo {
+  mix-blend-mode: multiply;
+}
+
+html.dark .brand-page .brand-logo {
+  filter: invert(1);
+  mix-blend-mode: screen;
+}
+
+.brand-page .brand-footer {
+  background: var(--brand-surface-low);
+  color: var(--brand-muted);
+}
+
+.brand-page .brand-label {
+  font-family: var(--font-brand-display), system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-muted);
+}
+
+.brand-page .brand-pixel {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--brand-accent-current);
+}
+
+.brand-page .brand-link {
+  color: var(--brand-accent-current);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.brand-page .brand-title {
+  font-family: var(--font-brand-display), system-ui, sans-serif;
+  font-weight: 500;
+  font-size: clamp(2.25rem, 6vw, 3.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--brand-ink);
+}
+
+.brand-page .brand-lead {
+  font-size: 1.375rem;
+  line-height: 1.5;
+  color: var(--brand-muted);
+}
+
+.brand-page .md-prose {
+  color: var(--brand-ink);
+  font-family: var(--font-brand-body), Georgia, serif;
+  font-size: 1.1875rem;
+  line-height: 1.7;
+}
+
+.brand-page .md-prose h1,
+.brand-page .md-prose h2,
+.brand-page .md-prose h3,
+.brand-page .md-prose h4 {
+  font-family: var(--font-brand-display), system-ui, sans-serif;
+  font-weight: 500;
+  color: var(--brand-ink);
+}
+
+.brand-page .md-prose h1 {
+  font-size: 2rem;
+  margin: 3.5rem 0 1.25rem;
+}
+
+.brand-page .md-prose h2 {
+  font-size: 1.5rem;
+  margin: 3rem 0 1rem;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.brand-page .md-prose h3 {
+  font-size: 1.2rem;
+  margin: 2.25rem 0 0.75rem;
+}
+
+.brand-page .md-prose a {
+  color: var(--brand-accent-current);
+}
+
+/* The agency's "no-line" rule: a quote sits on a tonal surface, not a bar. */
+.brand-page .md-prose blockquote {
+  border-left: none;
+  background: var(--brand-surface-low);
+  color: var(--brand-muted);
+  padding: 1.25rem 1.5rem;
+}
+
+.brand-page .md-prose hr {
+  border-top: none;
+  height: 3rem;
+}
+
+.brand-page .md-prose li::marker {
+  color: var(--brand-muted);
+}
+
+.brand-page .md-prose code,
+.brand-page .md-prose pre,
+.brand-page .md-prose th {
+  background: var(--brand-surface-low);
+  border-radius: 0;
+}
+
+.brand-page .md-prose th,
+.brand-page .md-prose td {
+  border: none;
+  border-bottom: 1px solid var(--brand-ghost);
+}
+
+.brand-page .md-prose th {
+  font-family: var(--font-brand-display), system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.brand-page .md-prose img,
+.brand-page .md-prose .code-block {
+  border-radius: 0;
+}
+
+.brand-page .md-prose .code-block {
+  border: none;
+  background: var(--brand-surface-low);
+}
+
+.brand-page .md-prose input[type="checkbox"] {
+  accent-color: var(--brand-accent-current);
+}
+
 /* Document typography */
 .md-prose {
   color: var(--foreground);

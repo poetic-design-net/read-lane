@@ -17,12 +17,20 @@ import { StatusPill, statusFromDocument } from "@/components/design/status-pill"
 import { Logo } from "@/components/brand/logo";
 import { appConfig } from "@/lib/config";
 import { brandConfig } from "@/lib/brand/config";
-import { shareUrl } from "@/lib/utils/urls";
+import { shareUrl, shareUrlOn } from "@/lib/utils/urls";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { getStorage } from "@/lib/storage";
 import { headers } from "next/headers";
 import { getVerifiedDomainByHost } from "@/lib/domains/service";
 import { getEntitlements } from "@/lib/plans/service";
+import {
+  BrandedEyebrow,
+  BrandedFrame,
+  type Brand,
+} from "@/components/document/branded-frame";
+import { getDb } from "@/lib/db";
+import { projects } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 /** Password sessions and visibility checks must never be statically cached. */
 export const dynamic = "force-dynamic";
@@ -38,26 +46,34 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { publicId } = await params;
+  const host = (await headers()).get("host");
+  const domain = host ? await getVerifiedDomainByHost(host) : null;
+  const brandName = domain ? (domain.brandName ?? domain.host) : null;
+  // On a custom domain the tab reads "Title · Agency", not "Title · Readlane".
+  const titled = (t: string) => (brandName ? { absolute: `${t} · ${brandName}` } : t);
+  const url = shareUrlOn(domain?.host, publicId);
   try {
     const { document, requiresPassword } =
       await getPublicDocumentView(publicId);
 
-    if (requiresPassword || document.visibility === "unlisted") {
+    // Unlisted pages on the agency's own domain keep their real title (still
+    // noindex below): the client sees it in the tab and in mail link previews.
+    if (requiresPassword || (document.visibility === "unlisted" && !brandName)) {
       return {
-        title: "Geschütztes Dokument",
+        title: titled("Geschütztes Dokument"),
         description: "Dieses Dokument ist nicht öffentlich indexierbar.",
         robots: { index: false, follow: false },
       };
     }
 
     return {
-      title: document.title,
+      title: titled(document.title),
       description: document.description ?? undefined,
-      alternates: { canonical: shareUrl(publicId) },
+      alternates: { canonical: url },
       openGraph: {
         title: document.title,
         description: document.description ?? appConfig.description,
-        url: shareUrl(publicId),
+        url,
         type: "article",
       },
       robots:
@@ -114,6 +130,20 @@ export default async function DocumentPage({ params }: PageProps) {
     ? await hasUnlockSession(publicId)
     : true;
 
+  const pageShareUrl = shareUrlOn(branding.host, publicId);
+
+  if (requiresPassword && !unlocked && branding.brand) {
+    return (
+      <DocShell theme={document.theme}>
+        <BrandedFrame brand={branding.brand} shareUrl={pageShareUrl}>
+          <div className="flex justify-center">
+            <PasswordForm publicId={publicId} title={document.title} />
+          </div>
+        </BrandedFrame>
+      </DocShell>
+    );
+  }
+
   if (requiresPassword && !unlocked) {
     return (
       <DocShell theme={document.theme}>
@@ -151,6 +181,49 @@ export default async function DocumentPage({ params }: PageProps) {
     visibility: document.visibility,
     isPasswordProtected: document.isPasswordProtected,
   });
+
+  const content = (
+    <FormatView
+      content={document.markdownContent}
+      rendererType={document.rendererType}
+      fileExtension={document.fileExtension}
+      sourceFilename={document.sourceFilename}
+      html={isMarkdown ? html : undefined}
+      showLineNumbers={document.showCodeLineNumbers}
+      fileUrl={fileUrl}
+      downloadUrl={downloadUrl}
+      allowDownload={document.allowDownload}
+    />
+  );
+
+  if (branding.brand) {
+    const projectName = await getProjectName(view.raw.projectId);
+    return (
+      <DocShell theme={document.theme}>
+        <BrandedFrame brand={branding.brand} shareUrl={pageShareUrl}>
+          <article className="mx-auto max-w-[44rem]">
+            <header className="mb-14">
+              <BrandedEyebrow>
+                {projectName && <span>{projectName}</span>}
+                {projectName && <span aria-hidden>·</span>}
+                <time dateTime={new Date(document.updatedAt).toISOString()}>
+                  {format(document.updatedAt, "d. MMMM yyyy", { locale: de })}
+                </time>
+              </BrandedEyebrow>
+              <h1 className="brand-title">{document.title}</h1>
+              {document.description && (
+                <p className="brand-lead mt-6">{document.description}</p>
+              )}
+            </header>
+            {document.showTableOfContents && toc.length > 0 && (
+              <TableOfContents items={toc} className="mb-12" />
+            )}
+            {content}
+          </article>
+        </BrandedFrame>
+      </DocShell>
+    );
+  }
 
   return (
     <DocShell theme={document.theme}>
@@ -216,17 +289,7 @@ export default async function DocumentPage({ params }: PageProps) {
               </p>
             </header>
 
-            <FormatView
-              content={document.markdownContent}
-              rendererType={document.rendererType}
-              fileExtension={document.fileExtension}
-              sourceFilename={document.sourceFilename}
-              html={isMarkdown ? html : undefined}
-              showLineNumbers={document.showCodeLineNumbers}
-              fileUrl={fileUrl}
-              downloadUrl={downloadUrl}
-              allowDownload={document.allowDownload}
-            />
+            {content}
 
             {branding.showReadlane && (
               <footer className="mt-16 border-t border-stone-100 pt-6 text-[12px] text-stone-400 dark:border-stone-800">
@@ -261,6 +324,9 @@ async function resolveBranding(doc: {
   logoUrl: string | null;
   showReadlane: boolean;
   color: string | null;
+  /** Set on a verified custom domain: render the branded frame. */
+  brand: Brand | null;
+  host: string | null;
 }> {
   const host = (await headers()).get("host");
   const domain = host ? await getVerifiedDomainByHost(host) : null;
@@ -269,12 +335,19 @@ async function resolveBranding(doc: {
     const belongs =
       domain.userId === doc.createdBy &&
       (!domain.projectId || domain.projectId === doc.projectId);
-    return {
-      wrongHost: !belongs,
+    const brand: Brand = {
       name: domain.brandName ?? domain.host,
       logoUrl: domain.brandLogoUrl,
-      showReadlane: false,
       color: domain.brandColor,
+      websiteUrl: domain.brandWebsiteUrl,
+      contact: domain.brandContact,
+    };
+    return {
+      wrongHost: !belongs,
+      ...brand,
+      showReadlane: false,
+      brand,
+      host: domain.host,
     };
   }
 
@@ -288,7 +361,19 @@ async function resolveBranding(doc: {
     logoUrl: null,
     showReadlane: !removeBranding,
     color: null,
+    brand: null,
+    host: null,
   };
+}
+
+async function getProjectName(projectId: string | null) {
+  if (!projectId) return null;
+  const [row] = await getDb()
+    .select({ name: projects.name })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  return row?.name ?? null;
 }
 
 function DocChrome({

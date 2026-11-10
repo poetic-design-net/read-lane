@@ -35,6 +35,14 @@ const brandingSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal("")),
+  brandWebsiteUrl: z
+    .string()
+    .url()
+    .startsWith("https://", "Nur https erlaubt")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  brandContact: z.string().trim().max(160).optional().nullable(),
 });
 
 export async function addDomainAction(
@@ -90,6 +98,8 @@ export async function updateDomainBrandingAction(
       brandName: parsed.data.brandName || null,
       brandColor: parsed.data.brandColor || null,
       brandLogoUrl: parsed.data.brandLogoUrl || null,
+      brandWebsiteUrl: parsed.data.brandWebsiteUrl || null,
+      brandContact: parsed.data.brandContact || null,
     });
     revalidatePath("/dashboard/settings");
     return { ok: true };

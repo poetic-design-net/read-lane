@@ -98,6 +98,8 @@ export default async function SettingsPage() {
               brandName: d.brandName,
               brandColor: d.brandColor,
               brandLogoUrl: d.brandLogoUrl,
+              brandWebsiteUrl: d.brandWebsiteUrl,
+              brandContact: d.brandContact,
             }))}
             projects={ownedProjects}
             enabled={entitlements.customDomains}

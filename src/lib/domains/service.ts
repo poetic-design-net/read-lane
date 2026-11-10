@@ -54,6 +54,8 @@ export async function listDomains(userId: string) {
       brandName: customDomains.brandName,
       brandColor: customDomains.brandColor,
       brandLogoUrl: customDomains.brandLogoUrl,
+      brandWebsiteUrl: customDomains.brandWebsiteUrl,
+      brandContact: customDomains.brandContact,
       projectName: projects.name,
     })
     .from(customDomains)
@@ -153,6 +155,8 @@ export async function updateDomainBranding(
     brandName?: string | null;
     brandColor?: string | null;
     brandLogoUrl?: string | null;
+    brandWebsiteUrl?: string | null;
+    brandContact?: string | null;
   }
 ) {
   const domain = await getOwnedDomain(userId, publicId);

@@ -636,6 +636,10 @@ export const customDomains = pgTable(
     brandName: text("brand_name"),
     brandColor: text("brand_color"),
     brandLogoUrl: text("brand_logo_url"),
+    /** Where the bare domain redirects and the page footer links to. */
+    brandWebsiteUrl: text("brand_website_url"),
+    /** One line of contact details in the page footer. */
+    brandContact: text("brand_contact"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -30,6 +30,8 @@ export interface DomainRow {
   brandName: string | null;
   brandColor: string | null;
   brandLogoUrl: string | null;
+  brandWebsiteUrl: string | null;
+  brandContact: string | null;
 }
 
 export function DomainsPanel({
@@ -225,12 +227,16 @@ function BrandingFields({
     brandName: string;
     brandColor: string;
     brandLogoUrl: string;
+    brandWebsiteUrl: string;
+    brandContact: string;
   }) => void;
 }) {
   const [values, setValues] = useState({
     brandName: domain.brandName ?? "",
     brandColor: domain.brandColor ?? "",
     brandLogoUrl: domain.brandLogoUrl ?? "",
+    brandWebsiteUrl: domain.brandWebsiteUrl ?? "",
+    brandContact: domain.brandContact ?? "",
   });
 
   return (
@@ -270,6 +276,32 @@ function BrandingFields({
           }
           placeholder="#1d4ed8"
           className="h-9 w-[120px]"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-[11px] text-stone-400">
+          Website (https)
+        </label>
+        <Input
+          value={values.brandWebsiteUrl}
+          onChange={(e) =>
+            setValues((v) => ({ ...v, brandWebsiteUrl: e.target.value }))
+          }
+          placeholder="https://example.com"
+          className="h-9 w-[200px]"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-[11px] text-stone-400">
+          Kontaktzeile (Fußzeile)
+        </label>
+        <Input
+          value={values.brandContact}
+          onChange={(e) =>
+            setValues((v) => ({ ...v, brandContact: e.target.value }))
+          }
+          placeholder="hallo@example.com · +49 …"
+          className="h-9 w-[240px]"
         />
       </div>
       <Button
