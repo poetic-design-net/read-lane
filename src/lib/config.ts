@@ -1,6 +1,6 @@
 /**
  * Central application configuration.
- * Brand: Readlane (CI: Publish beautifully)
+ * Brand: Poetic Design Notes
  *
  * Palette: #F7F7F5 · #E5E7EB · #6B7C93 · #2B313B · #121417
  * Assets: /public/brand/ · src/components/brand/logo.tsx
@@ -11,13 +11,13 @@ function stripTrailingSlash(url: string): string {
 }
 
 export const appConfig = {
-  name: process.env.NEXT_PUBLIC_APP_NAME ?? "Readlane",
+  name: process.env.NEXT_PUBLIC_APP_NAME ?? "Poetic Design Notes",
   description:
     process.env.NEXT_PUBLIC_APP_DESCRIPTION ??
-    "Markdown schön teilen. Datei hochladen, Darstellung auswählen und einen öffentlichen oder passwortgeschützten Link versenden.",
-  tagline: "Publish beautifully",
-  claim: "Files in. Beautiful pages out.",
-  brandClaim: "Publish beautifully",
+    "Updates, Konzepte und Angebote als ruhig gesetzte Seite, verschickt mit einem einzigen Link.",
+  tagline: "Notizen, die man gern liest",
+  claim: "Notes · Poetic Design",
+  brandClaim: "poetic-design.net",
   /** App host — dashboard, create, share links (e.g. https://app.readlane.io) */
   url: stripTrailingSlash(
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"

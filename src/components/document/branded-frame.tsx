@@ -1,18 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Newsreader, Space_Grotesk } from "next/font/google";
+import { brandFontVars } from "@/components/brand/fonts";
 import { DocumentToolbar } from "@/components/document/document-toolbar";
 import { cn } from "@/lib/utils";
-
-const display = Space_Grotesk({
-  variable: "--font-brand-display",
-  subsets: ["latin"],
-});
-
-const body = Newsreader({
-  variable: "--font-brand-body",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-});
 
 export type Brand = {
   name: string;
@@ -43,7 +32,7 @@ export function BrandedFrame({
 
   return (
     <div
-      className={cn("brand-page flex min-h-0 flex-1 flex-col", display.variable, body.variable)}
+      className={cn("brand-page flex min-h-0 flex-1 flex-col", brandFontVars)}
       style={style}
     >
       <header className="brand-header flex h-16 shrink-0 items-center justify-between px-5 sm:px-10">

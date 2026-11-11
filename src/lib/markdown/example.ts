@@ -1,9 +1,9 @@
 export const EXAMPLE_MARKDOWN = `---
-title: Willkommen bei Readlane
+title: Willkommen bei Poetic Design Notes
 description: Ein kurzes Beispieldokument
 ---
 
-# Willkommen bei Readlane
+# Willkommen bei Poetic Design Notes
 
 Dies ist ein **Beispieldokument**, das zeigt, wie Markdown dargestellt wird.
 

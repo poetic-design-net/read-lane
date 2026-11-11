@@ -2,17 +2,17 @@
  * Central branding — swap assets in /public/brand without code changes.
  */
 export const brandConfig = {
-  name: process.env.NEXT_PUBLIC_APP_NAME ?? "Readlane",
-  shortName: process.env.NEXT_PUBLIC_APP_NAME ?? "Readlane",
-  tagline: "Publish beautifully",
-  claimEn: "Files in. Beautiful pages out.",
+  name: process.env.NEXT_PUBLIC_APP_NAME ?? "Poetic Design Notes",
+  shortName: process.env.NEXT_PUBLIC_APP_NAME ?? "Poetic Design Notes",
+  tagline: "Notizen, die man gern liest",
+  claimEn: "Notes · Poetic Design",
   claimDe: "Aus Dateien werden schöne Seiten.",
-  heroHeadlineDe: "Dokumente schön teilen.",
+  heroHeadlineDe: "Statt langer Mails: eine Seite, die man gern liest.",
   heroSubDe:
-    "Markdown, PDF, Text, Code und weitere Formate hochladen, professionell darstellen und sicher per Link teilen.",
-  logoLight: "/brand/logo-symbol.png",
-  logoDark: "/brand/logo-symbol.png",
-  symbolLight: "/brand/logo-symbol.avif",
-  symbolDark: "/brand/logo-symbol.avif",
+    "Updates, Konzepte und Angebote als ruhig gesetzte Seite, verschickt mit einem einzigen Link.",
+  logoLight: "/brand/poetic-feather.png",
+  logoDark: "/brand/poetic-feather.png",
+  symbolLight: "/brand/poetic-feather.png",
+  symbolDark: "/brand/poetic-feather.png",
   favicon: "/brand/favicon-32.png",
 } as const;

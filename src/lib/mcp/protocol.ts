@@ -35,7 +35,7 @@ export class ToolError extends Error {}
 const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
 
 export const SERVER_INSTRUCTIONS =
-  "Readlane veröffentlicht Markdown als gestaltete Seite unter der Domain und dem Branding des Projekts. " +
+  "Poetic Design Notes (Readlane) veröffentlicht Markdown als gestaltete Seite unter der Domain und dem Branding des Projekts. " +
   "Ein Projekt steht für einen Kunden. Ablauf für ein Kunden-Update: list_projects, dann publish_document mit " +
   "dem Projekt; das Ergebnis enthält den Link und die hinterlegten Empfänger. Die Mail mit dem Link nie selbst " +
   "senden, sondern als Entwurf anlegen, damit der Nutzer sie prüft.";

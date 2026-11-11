@@ -31,7 +31,6 @@ export const metadata: Metadata = {
   applicationName: appConfig.name,
   icons: {
     icon: [
-      { url: "/brand/logo-symbol.avif", type: "image/avif", sizes: "512x512" },
       { url: "/brand/favicon-32.png", type: "image/png", sizes: "32x32" },
       { url: "/brand/favicon-16.png", type: "image/png", sizes: "16x16" },
     ],

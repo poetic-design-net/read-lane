@@ -79,7 +79,7 @@ export function readlaneTools(auth: Auth): McpTool[] {
       async run() {
         const projects = await visibleProjects(auth);
         if (projects.length === 0) {
-          return "Keine Projekte. Lege im Readlane-Dashboard ein Projekt pro Kunde an.";
+          return "Keine Projekte. Lege im Dashboard ein Projekt pro Kunde an.";
         }
         return projects
           .map(

@@ -19,7 +19,7 @@ export interface ExampleDocument {
   url?: string;
 }
 
-const EXAMPLE_TEXT = `Readlane — Beispiel
+const EXAMPLE_TEXT = `Poetic Design Notes — Beispiel
 
 Reiner Text wird so ausgeliefert, wie er geschrieben wurde: gleiche Umbrüche,
 gleiche Reihenfolge, nur in einer Schrift, die sich lesen lässt.

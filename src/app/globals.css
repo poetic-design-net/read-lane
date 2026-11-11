@@ -227,6 +227,77 @@ html.dark .brand-page .brand-logo {
   color: var(--brand-muted);
 }
 
+/* Landing page pieces */
+.brand-page .brand-button {
+  display: inline-flex;
+  align-items: center;
+  height: 2.75rem;
+  padding: 0 1.25rem;
+  font-family: var(--font-brand-display), system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: var(--brand-ink);
+  color: var(--brand-bg);
+  transition: background-color 150ms ease;
+}
+
+.brand-page .brand-button:hover {
+  background: var(--brand-accent-current);
+}
+
+.brand-page .brand-button:focus-visible {
+  outline: 2px solid var(--brand-accent-current);
+  outline-offset: 2px;
+}
+
+.brand-page .brand-button-ghost {
+  background: transparent;
+  color: var(--brand-ink);
+  box-shadow: inset 0 0 0 1px var(--brand-ghost);
+}
+
+.brand-page .brand-button-ghost:hover {
+  background: var(--brand-surface-low);
+}
+
+.brand-page .brand-band {
+  background: var(--brand-surface-low);
+}
+
+.brand-page .brand-sheet {
+  background: var(--brand-sheet, #ffffff);
+  box-shadow: 0 20px 40px rgb(26 28 28 / 0.05);
+}
+
+html.dark .brand-page .brand-sheet {
+  --brand-sheet: #1f2121;
+}
+
+.brand-page .brand-sheet-title,
+.brand-page .brand-sheet-heading,
+.brand-page .brand-section-title {
+  font-family: var(--font-brand-display), system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--brand-ink);
+}
+
+.brand-page .brand-sheet-title {
+  font-size: 1.875rem;
+  line-height: 1.1;
+}
+
+.brand-page .brand-sheet-heading {
+  font-size: 1.125rem;
+}
+
+.brand-page .brand-section-title {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
 .brand-page .md-prose {
   color: var(--brand-ink);
   font-family: var(--font-brand-body), Georgia, serif;

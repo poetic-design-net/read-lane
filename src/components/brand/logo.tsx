@@ -23,10 +23,7 @@ const wordSizes: Record<LogoSize, string> = {
   lg: "text-[15px]",
 };
 
-/**
- * Official brand mark from CI — AVIF primary, PNG fallback, 2× for retina.
- * Full symbol as designed (no cutout / no simplified SVG).
- */
+/** The Poetic Design feather. Dark artwork on transparency, inverted in dark mode. */
 export function LogoMark({
   className,
   size = "md",
@@ -39,29 +36,20 @@ export function LogoMark({
   const px = markPx[size];
 
   return (
-    <picture>
-      <source
-        type="image/avif"
-        srcSet="/brand/logo-symbol-64.avif 1x, /brand/logo-symbol-128.avif 2x"
-      />
-      <source
-        type="image/png"
-        srcSet="/brand/logo-symbol-64.png 1x, /brand/logo-symbol-128.png 2x"
-      />
-      <img
-        src="/brand/logo-symbol-64.png"
-        alt={title}
-        width={px}
-        height={px}
-        className={cn(
-          "shrink-0 object-contain select-none",
-          markSizes[size],
-          className
-        )}
-        draggable={false}
-        decoding="async"
-      />
-    </picture>
+    // eslint-disable-next-line @next/next/no-img-element -- tiny static mark
+    <img
+      src="/brand/poetic-feather.png"
+      alt={title}
+      width={px}
+      height={px}
+      className={cn(
+        "shrink-0 object-contain select-none dark:invert",
+        markSizes[size],
+        className
+      )}
+      draggable={false}
+      decoding="async"
+    />
   );
 }
 

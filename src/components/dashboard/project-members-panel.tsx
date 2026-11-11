@@ -161,7 +161,7 @@ export function ProjectMembersPanel({
               Hinzufügen
             </Button>
             <p className="w-full text-[11px] text-stone-400">
-              Die Person braucht bereits ein Readlane-Konto mit dieser Adresse.
+              Die Person braucht bereits ein Konto mit dieser Adresse.
             </p>
           </form>
         ) : (
